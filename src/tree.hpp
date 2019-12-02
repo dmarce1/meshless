@@ -19,28 +19,40 @@ class tree;
 using tree_ptr = std::shared_ptr<tree>;
 static constexpr auto null_tree_ptr = nullptr;
 
+struct tree_stats {
+	int max_level;
+	int n_nodes;
+	int n_leaves;
+	int n_part;
+	int n_neighbor;
+};
+
 class tree {
 
-	static constexpr int NMAX = 1000;
+	static constexpr int NMAX = 100;
 	std::array<tree_ptr, NCHILD> children;
-	std::array<tree_ptr, NSIBLING> siblings;
 	tree_ptr parent;
 	tree_ptr self;
 	std::vector<particle> parts;
 	bool refined;
 	range box;
-
+	int level;
 	void make_tree(std::vector<particle> &&p);
-	void find_siblings(std::array<tree_ptr, NSIBLING>&&);
 	void compute_smoothing_lengths(tree_ptr root);
+	void compute_interactions();
+	void particles_in_range(std::vector<const particle*>&, const range&) const;
+	void form_tree(tree_ptr, int);
 
 public:
+	void find_neighbors();
+	tree(std::vector<particle>&&, const range&);
 	tree(std::vector<particle>&&);
-	tree(std::vector<particle>&&, const range&, tree_ptr parent);
+	tree_stats compute_tree_statistics() const;
 	void compute_smoothing_lengths();
+	real compute_volumes();
 	void destroy();
-	void find_siblings();
-	std::vector<const particle*> particles_in_range(const range&) const;
+	void form_tree();
+	void particles_in_sphere(std::vector<const particle*>&, const vect&, real) const;
 
 	template<class ...Args>
 	static tree_ptr new_tree(Args &&...args) {
@@ -48,6 +60,6 @@ public:
 		ptr->self = ptr;
 		return ptr;
 	}
-
 };
+
 #endif /* TREE_HPP_ */
