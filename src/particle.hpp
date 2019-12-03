@@ -9,18 +9,20 @@
 #define PARTICLE_HPP_
 
 #include "math.hpp"
-#include <set>
+#include "state.hpp"
 #include <vector>
 
 struct particle;
 
 struct neighbor {
 	particle *ptr;
-	vect psi_a;
+	neighbor *ret;
+	atomic_vect area;
+	state flux;
 	inline neighbor(particle *_ptr) :
 			ptr(_ptr) {
 	}
-	inline bool operator<(const neighbor& other) const {
+	inline bool operator<(const neighbor &other) const {
 		return ptr < other.ptr;
 	}
 };
@@ -29,7 +31,17 @@ struct particle {
 	vect x;
 	real h;
 	real V;
-	std::set<neighbor> neighbors;
+	state st;
+	real rho() const {
+		return st.mass() / V;
+	}
+	real E() const {
+		return st.energy() / V;
+	}
+	vect v() const {
+		return st.momentum() / st.mass();
+	}
+	std::vector<neighbor> neighbors;
 	particle();
 	bool h_not_set() const;
 	real omega() const;

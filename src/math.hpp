@@ -22,11 +22,11 @@ real bspline(real r);
 real d_bspline_dr(real r);
 real W_norm(real h);
 real dW_norm_dh(real h);
-inline real box_volume(const range& R);
+inline real box_volume(const range &R);
 
 inline bool in_range(const vect &x, const range &r) {
 	for (int dim = 0; dim < NDIM; dim++) {
-		if (x[dim] < r.first[dim] || x[dim] > r.second[dim]) {
+		if (x[dim] < r.first[dim] || x[dim] >= r.second[dim]) {
 			return false;
 		}
 	}
@@ -35,13 +35,18 @@ inline bool in_range(const vect &x, const range &r) {
 
 inline bool ranges_intersect(const range &a, const range &b) {
 	for (int dim = 0; dim < NDIM; dim++) {
-		if (a.second[dim] < b.first[dim] || b.second[dim] < a.first[dim]) {
-			return false;
+		if (a.first[dim] < b.first[dim]) {
+			if (a.second[dim] < b.first[dim]) {
+				return false;
+			}
+		} else {
+			if (b.second[dim] < a.first[dim]) {
+				return false;
+			}
 		}
 	}
 	return true;
 }
-
 inline real W(real r, real h) {
 	auto norm = W_norm(h);
 	return bspline(2 * r / h) / norm;
@@ -93,9 +98,9 @@ inline real dW_norm_dh(real h) {
 	}
 }
 
-inline real box_volume(const range& R) {
+inline real box_volume(const range &R) {
 	real vol = 1.0;
-	for( int dim = 0; dim <NDIM; dim++) {
+	for (int dim = 0; dim < NDIM; dim++) {
 		vol *= R.second[dim] - R.first[dim];
 	}
 	return vol;
@@ -106,8 +111,8 @@ inline real rand_unit_box() {
 	return x - 0.5;
 }
 
-inline std::array<vect,NDIM> matrix_inverse(const std::array<vect,NDIM>& A) {
-	std::array<vect,NDIM> Ainv;
+inline std::array<vect, NDIM> matrix_inverse(const std::array<vect, NDIM> &A) {
+	std::array<vect, NDIM> Ainv;
 #if(NDIM==1)
 	Ainv[0][0] = 1.0 / A[0][0];
 #else
@@ -136,7 +141,6 @@ inline std::array<vect,NDIM> matrix_inverse(const std::array<vect,NDIM>& A) {
 #endif
 	return Ainv;
 }
-
 
 inline real distance(const vect &a, const vect &b) {
 	real d = 0.0;

@@ -38,6 +38,11 @@ tree::tree(std::vector<particle> &&parts) :
 			min = std::min(min, x);
 			max = std::max(max, x);
 		}
+		for (int dim = 0; dim < NDIM; dim++) {
+			static const auto round_error = std::numeric_limits<real>::round_error();
+			box.first[dim] -= round_error;
+			box.second[dim] += round_error;
+		}
 	}
 	make_tree(std::move(parts));
 }
@@ -69,16 +74,120 @@ void tree::compute_interactions() {
 			for (auto &other : part.neighbors) {
 				const auto &pj = *(other.ptr);
 				const auto psi_j = W(abs(pi.x - pj.x), pi.h) / pi.V;
-				vect psi_a_j;
+
+				real psi_a_j;
 				for (int n = 0; n < NDIM; n++) {
-					psi_a_j[n] = 0.0;
+					psi_a_j = 0.0;
 					for (int m = 0; m < NDIM; m++) {
-						psi_a_j[n] += B[n][m] * (pj.x[m] - pi.x[m]) * psi_j;
+						psi_a_j += B[n][m] * (pj.x[m] - pi.x[m]) * psi_j;
 					}
+					const real da = part.V * psi_a_j;
+					other.area[n] += da;
+					other.ret->area[n] -= da;
 				}
 			}
 		}
 	}
+}
+
+void tree::output(const char *filename) {
+	if (refined) {
+		for (int ci = 0; ci < NCHILD; ci++) {
+			children[ci]->output(filename);
+		}
+	} else {
+		FILE *fp = fopen("parts.txt", "at");
+		for (auto &part : parts) {
+			for (int dim = 0; dim < NDIM; dim++) {
+				fprintf(fp, "%e ", part.x[dim]);
+			}
+			fprintf(fp, "%e ", part.V);
+			fprintf(fp, "%e ", part.h);
+			fprintf(fp, "%e ", part.rho());
+			fprintf(fp, "%e ", part.E());
+			for (int dim = 0; dim < NDIM; dim++) {
+				fprintf(fp, "%e ", part.v()[dim]);
+			}
+			fprintf(fp, "%i\n", part.neighbors.size());
+		}
+		fclose(fp);
+	}
+}
+
+void tree::compute_next_step(real dt) {
+	if (refined) {
+		for (int ci = 0; ci < NCHILD; ci++) {
+			children[ci]->compute_next_step(dt);
+		}
+	} else {
+		for (auto &part : parts) {
+			auto &pi = part;
+			for (auto &other : part.neighbors) {
+				const auto area = abs(other.area);
+				pi.st = pi.st - other.flux * dt * area * 0.5;
+			}
+			pi.x = pi.x + pi.v() * dt;
+			for (auto &other : part.neighbors) {
+				const auto area = abs(other.area);
+				pi.st = pi.st - other.flux * dt * area * 0.5;
+			}
+		}
+	}
+}
+
+void tree::initialize(const std::function<state(vect)> &f) {
+	if (refined) {
+		for (int ci = 0; ci < NCHILD; ci++) {
+			children[ci]->initialize(f);
+		}
+	} else {
+		for (auto &part : parts) {
+			part.st = f(part.x) * part.V;
+		}
+	}
+}
+
+real tree::compute_fluxes() {
+	real tmin = std::numeric_limits<real>::max();
+	if (refined) {
+		for (int ci = 0; ci < NCHILD; ci++) {
+			const real this_t = children[ci]->compute_fluxes();
+			tmin = std::min(this_t, tmin);
+		}
+	} else {
+		for (auto &part : parts) {
+			for (auto &other : part.neighbors) {
+				auto &pi = part;
+				auto &pj = *(other.ptr);
+				vect A;
+				for (int dim = 0; dim < NDIM; dim++) {
+					A[dim] = other.area[dim];
+				}
+				auto dx = pj.x - pi.x;
+				auto xij = pi.x + dx * (pi.h) / (pi.h + pj.h);
+				auto vij = pi.v() + (pj.v() - pi.v()) * (xij - pi.x).dot(dx) / (dx.dot(dx));
+				auto norm = A / abs(A);
+				const auto tmp = flux(pi.st, pj.st, vij, pi.V, pj.V, norm);
+				other.flux = tmp.first;
+				other.ret->flux = -tmp.first;
+				tmin = std::min(tmin, pi.h / tmp.second);
+			}
+		}
+	}
+	return tmin;
+}
+
+std::vector<particle> tree::gather_particles() const {
+	std::vector<particle> return_parts;
+	if (refined) {
+		for (int ci = 0; ci < NCHILD; ci++) {
+			auto tmp = children[ci]->gather_particles();
+			return_parts.insert(return_parts.end(), tmp.begin(), tmp.end());
+		}
+	} else {
+		return_parts = parts;
+	}
+	return return_parts;
 }
 
 void tree::find_neighbors() {
@@ -88,11 +197,23 @@ void tree::find_neighbors() {
 		}
 	} else {
 		for (auto &part : parts) {
-			for (auto this_n : part.neighbors) {
-				auto &nset = this_n.ptr->neighbors;
+			for (auto &this_n : part.neighbors) {
+				auto &others = this_n.ptr->neighbors;
 				const auto ptr = &part;
-				if (nset.find(ptr) == nset.end()) {
-					nset.insert(ptr);
+				bool found = false;
+				for (auto &other : others) {
+					if (ptr == other.ptr) {
+						found = true;
+						this_n.ret = &other;
+						other.ret = &this_n;
+						break;
+					}
+				}
+				if (!found) {
+					others.push_back(neighbor(ptr));
+					auto &other = others[others.size() - 1];
+					this_n.ret = &other;
+					other.ret = &this_n;
 				}
 			}
 		}
@@ -149,8 +270,8 @@ void tree::make_tree(std::vector<particle> &&_parts) {
 			std::sort(ptrs.begin(), ptrs.end(), [dim](particle *a, particle *b) {
 				return a->x[dim] < b->x[dim];
 			});
-			mid[dim] = ptrs[sz / 2]->x[dim];
-//			mid[dim] = (box.first[dim] + box.second[dim]) / 2.0;
+//			mid[dim] = ptrs[sz / 2]->x[dim];
+			mid[dim] = (box.first[dim] + box.second[dim]) / 2.0;
 		}
 		range this_box;
 		for (int n = 0; n < NCHILD; n++) {
@@ -210,7 +331,7 @@ void tree::compute_smoothing_lengths(tree_ptr root) {
 			}));
 		}
 		hpx::wait_all(futs);
-	} else {
+	} else if( parts.size() ){
 		std::vector<const particle*> others;
 		const real vol = box_volume(box);
 		const real h0 = std::pow(NGB * vol / parts.size(), 1.0 / NDIM);
@@ -222,7 +343,6 @@ void tree::compute_smoothing_lengths(tree_ptr root) {
 		const int sz = parts.size();
 		for (int i = 0; i < sz; i++) {
 			auto &part = parts[i];
-			bool done = false;
 			double N;
 			int iters = 0;
 			//		printf("\n");
@@ -258,7 +378,9 @@ void tree::compute_smoothing_lengths(tree_ptr root) {
 			} while (std::abs(NGB - N) > 0.5);
 			part.neighbors.clear();
 			for (auto &other : others) {
-				part.neighbors.insert(const_cast<particle*>(other));
+				if (other != &part) {
+					part.neighbors.push_back(const_cast<particle*>(other));
+				}
 			}
 		}
 	}
@@ -273,8 +395,11 @@ real tree::compute_volumes() {
 	} else {
 		for (auto &part : parts) {
 			double omega = 0.0;
-			for (const auto &neighbor : part.neighbors) {
+			for (auto &neighbor : part.neighbors) {
 				omega += W(abs(part.x - neighbor.ptr->x), part.h);
+				for (int dim = 0; dim < NDIM; dim++) {
+					neighbor.area[dim] = 0.0;
+				}
 			}
 			//	printf( "%e %e\n", 1.0 / omega, part.h);
 			part.V = 1.0 / omega;

@@ -1,0 +1,116 @@
+/*
+ * general_vect.hpp
+ *
+ *  Created on: Nov 30, 2019
+ *      Author: dmarce1
+ */
+
+#ifndef VECT_HPP_
+#define VECT_HPP_
+
+#include "dim.hpp"
+#include "real.hpp"
+
+#include <array>
+#include <atomic>
+#include <cmath>
+
+template<class T, int N>
+class general_vect {
+	std::array<real, N> v;
+public:
+	general_vect() = default;
+	general_vect(std::array<real, N> a) :
+			v(a) {
+	}
+	real& operator[](int i);
+	real operator[](int i) const;
+	general_vect operator-() const;
+	general_vect operator-(const general_vect &other) const;
+	general_vect operator+(const general_vect &other) const;
+	general_vect operator*(real r) const;
+	general_vect operator/(real r) const;
+	real dot(const general_vect &other) const;
+	bool operator!=( const general_vect& other) const {
+		for( int dim = 0; dim < NDIM; dim++ ) {
+			if( other[dim] != (*this)[dim]) {
+				return true;
+			}
+		}
+		return false;
+	}
+};
+
+template<class T, int N>
+inline real& general_vect<T, N>::operator[](int i) {
+	return v[i];
+}
+
+template<class T, int N>
+inline real general_vect<T, N>::operator[](int i) const {
+	return v[i];
+}
+
+template<class T, int N>
+inline general_vect<T, N> general_vect<T, N>::operator-() const {
+	general_vect<T, N> result;
+	for (int dim = 0; dim < N; dim++) {
+		result[dim] = -v[dim];
+	}
+	return result;
+}
+
+template<class T, int N>
+inline general_vect<T, N> general_vect<T, N>::operator-(const general_vect<T, N> &other) const {
+	general_vect<T, N> result;
+	for (int dim = 0; dim < N; dim++) {
+		result[dim] = v[dim] - other[dim];
+	}
+	return result;
+}
+
+template<class T, int N>
+inline general_vect<T, N> general_vect<T, N>::operator+(const general_vect<T, N> &other) const {
+	general_vect<T, N> result;
+	for (int dim = 0; dim < N; dim++) {
+		result[dim] = v[dim] + other[dim];
+	}
+	return result;
+}
+
+template<class T, int N>
+inline general_vect<T, N> general_vect<T, N>::operator*(real r) const {
+	general_vect<T, N> result;
+	for (int dim = 0; dim < N; dim++) {
+		result[dim] = v[dim] * r;
+	}
+	return result;
+}
+
+template<class T, int N>
+inline general_vect<T, N> general_vect<T, N>::operator/(real r) const {
+	general_vect<T, N> result;
+	for (int dim = 0; dim < N; dim++) {
+		result[dim] = v[dim] / r;
+	}
+	return result;
+}
+
+template<class T, int N>
+inline real general_vect<T, N>::dot(const general_vect<T, N> &other) const {
+	real result = 0.0;
+	for (int dim = 0; dim < N; dim++) {
+		result += v[dim] * other[dim];
+	}
+	return result;
+}
+
+template<class T, int N>
+inline real abs(const general_vect<T, N> &v) {
+	return std::sqrt(v.dot(v));
+}
+
+using vect = general_vect<real, NDIM>;
+using atomic_vect = general_vect<std::atomic<real>, NDIM>;
+
+#endif /* VECT_HPP_ */
