@@ -53,6 +53,7 @@ public:
 	tree(std::vector<particle>&&);
 	tree_stats compute_tree_statistics() const;
 	void compute_smoothing_lengths();
+	void compute_gradients();
 	real compute_volumes();
 	void destroy();
 	void form_tree();

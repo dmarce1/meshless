@@ -9,6 +9,7 @@
 #define STATE_HPP_
 
 static int constexpr STATE_SIZE = 2 + NDIM;
+static double constexpr fgamma = 7.0 / 5.0;
 
 struct state: public general_vect<real, STATE_SIZE> {
 	state& operator=(const general_vect<real, STATE_SIZE> &other) {
@@ -49,20 +50,20 @@ struct state: public general_vect<real, STATE_SIZE> {
 		const auto v = v0 - vf;
 		const auto vnorm = v.dot(norm);
 		const auto ein = std::max(energy() - momentum().dot(momentum()) * (0.5 / mass()), 0.0);
-		const auto pre = (2.0 / 3.0) * ein / vol;
+		const auto pre = (fgamma - 1.0) * ein / vol;
 		f.mass() = mass() / vol * vnorm;
-		for( int dim = 0; dim < NDIM; dim++) {
+		for (int dim = 0; dim < NDIM; dim++) {
 			f.momentum(dim) = momentum(dim) / vol * vnorm + norm[dim] * pre;
 		}
-		f.energy() = mass() / vol * vnorm + vnorm * pre;
-		const auto cs = std::sqrt(ein / mass() * 5.0 / 3.0 * 2.0 / 3.0);
+		f.energy() = mass() / vol * vnorm + v0.dot(norm) * pre;
+		const auto cs = std::sqrt(ein / mass() * fgamma * (fgamma - 1));
 		p.second = cs + std::abs(vnorm);
 		return p;
 	}
 };
 
-inline std::pair<state,real> flux(const state &L, const state &R, const vect &vf, real volL, real volR, const vect &norm) {
-	std::pair<state,real> F;
+inline std::pair<state, real> flux(const state &L, const state &R, const vect &vf, real volL, real volR, const vect &norm) {
+	std::pair<state, real> F;
 	const auto tmpL = L.flux(vf, volL, norm);
 	const auto tmpR = R.flux(vf, volR, norm);
 	const state &fL = tmpL.first;
@@ -70,8 +71,8 @@ inline std::pair<state,real> flux(const state &L, const state &R, const vect &vf
 	const real &cL = tmpL.second;
 	const real &cR = tmpR.second;
 	const real c = std::max(cL, cR);
-	F.first = ((fL + fR) - (R - L) * c) * 0.5;
-	F.second = c;
+	F.first = ((fL + fR) - (R / volR - L / volL) * c) * 0.5;
+	F.second = cR + cL;
 	return F;
 }
 

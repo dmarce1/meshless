@@ -11,20 +11,20 @@
 #include "math.hpp"
 #include "state.hpp"
 #include <vector>
+#include <memory>
 
 struct particle;
 
 struct neighbor {
 	particle *ptr;
-	neighbor *ret;
-	atomic_vect area;
+	std::shared_ptr<neighbor> ret;
+	vect area;
 	state flux;
+	vect psi_a;
 	inline neighbor(particle *_ptr) :
 			ptr(_ptr) {
 	}
-	inline bool operator<(const neighbor &other) const {
-		return ptr < other.ptr;
-	}
+	neighbor() = default;
 };
 
 struct particle {
@@ -32,6 +32,7 @@ struct particle {
 	real h;
 	real V;
 	state st;
+	std::array<state,NDIM> gradient;
 	real rho() const {
 		return st.mass() / V;
 	}
@@ -41,7 +42,7 @@ struct particle {
 	vect v() const {
 		return st.momentum() / st.mass();
 	}
-	std::vector<neighbor> neighbors;
+	std::vector<std::shared_ptr<neighbor>> neighbors;
 	particle();
 	bool h_not_set() const;
 	real omega() const;
