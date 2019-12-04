@@ -29,7 +29,7 @@ int hpx_main(int argc, char *argv[]) {
 	feenableexcept(FE_INVALID);
 	feenableexcept(FE_OVERFLOW);
 
-	auto parts = cartesian_particle_set(10000);
+	auto parts = cartesian_particle_set(1000);
 	auto t = tree::new_tree(std::move(parts));
 	t->form_tree();
 	t->compute_smoothing_lengths();

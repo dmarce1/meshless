@@ -219,14 +219,10 @@ std::vector<particle> tree::gather_particles() const {
 }
 
 void tree::find_neighbors() {
-	std::vector<hpx::future<void>> futs;
 	if (refined) {
 		for (int ci = 0; ci < NCHILD; ci++) {
-			futs.push_back(hpx::async([this,ci] {
-				children[ci]->find_neighbors();
-			}));
+			children[ci]->find_neighbors();
 		}
-		hpx::wait_all(futs);
 	} else {
 		for (auto &part : parts) {
 			for (auto &this_n : part.neighbors) {
@@ -236,28 +232,16 @@ void tree::find_neighbors() {
 				for (auto &other : others) {
 					if (ptr == other->ptr) {
 						found = true;
-						{
-							std::lock_guard<hpx::lcos::local::spinlock> lock(*this_n->mtx);
-							this_n->ret = other;
-						}
-						{
-							std::lock_guard<hpx::lcos::local::spinlock> lock(*other->mtx);
-							other->ret = this_n;
-						}
+						this_n->ret = other;
+						other->ret = this_n;
 						break;
 					}
 				}
 				if (!found) {
 					others.push_back(std::make_shared<neighbor>(ptr));
 					auto &other = others[others.size() - 1];
-					{
-						std::lock_guard<hpx::lcos::local::spinlock> lock(*this_n->mtx);
-						this_n->ret = other;
-					}
-					{
-						std::lock_guard<hpx::lcos::local::spinlock> lock(*other->mtx);
-						other->ret = this_n;
-					}
+					this_n->ret = other;
+					other->ret = this_n;
 				}
 			}
 		}
@@ -346,11 +330,11 @@ void tree::make_tree(std::vector<particle> &&_parts) {
 					_parts.resize(sz);
 				}
 			}
-			futs.push_back(hpx::async([this_box](std::vector<particle>&& cparts) {
+			futs.push_back(hpx::async([this_box](std::vector<particle> &&cparts) {
 				return new_tree(std::move(cparts), this_box);
 			}, std::move(cparts)));
 		}
-		for( int ci = 0; ci < NCHILD; ci++) {
+		for (int ci = 0; ci < NCHILD; ci++) {
 			children[ci] = futs[ci].get();
 		}
 	}
@@ -367,7 +351,7 @@ void tree::form_tree(tree_ptr _parent, int _level) {
 	std::vector<hpx::future<void>> futs;
 	if (refined) {
 		for (int ci = 0; ci < NCHILD; ci++) {
-			futs.push_back(hpx::async([this,ci]() {
+			futs.push_back(hpx::async([this, ci]() {
 				children[ci]->form_tree(self, level + 1);
 			}));
 		}
@@ -471,16 +455,10 @@ void tree::compute_gradients() {
 }
 
 real tree::compute_volumes() {
-	std::vector<hpx::future<real>> futs;
 	real total = 0.0;
 	if (refined) {
 		for (int ci = 0; ci < NCHILD; ci++) {
-			futs.push_back(hpx::async([this,ci]() {
-				return children[ci]->compute_volumes();
-			}));
-		}
-		for( int ci = 0; ci < NCHILD; ci++) {
-			total += futs[ci].get();
+			total += children[ci]->compute_volumes();
 		}
 	} else {
 		for (auto &part : parts) {
