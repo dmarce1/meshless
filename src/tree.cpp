@@ -40,9 +40,8 @@ tree::tree(std::vector<particle> &&parts) :
 			max = std::max(max, x);
 		}
 		for (int dim = 0; dim < NDIM; dim++) {
-			static const auto round_error = std::numeric_limits<real>::round_error();
-			box.first[dim] -= round_error;
-			box.second[dim] += round_error;
+			box.first[dim] -= std::numeric_limits<real>::epsilon() * box.first[dim];
+			box.second[dim] += std::numeric_limits<real>::epsilon() * box.second[dim];
 		}
 	}
 	make_tree(std::move(parts));
@@ -95,6 +94,28 @@ void tree::compute_interactions() {
 	}
 }
 
+void tree::boundary_conditions() {
+	boundary_conditions(box);
+}
+
+void tree::boundary_conditions(const range &rng) {
+	std::vector<hpx::future<void>> futs;
+	if (refined) {
+		for (int ci = 0; ci < NCHILD; ci++) {
+			futs.push_back(hpx::async([this, ci, rng]() {
+				children[ci]->boundary_conditions(rng);
+			}));
+		}
+		hpx::wait_all(futs);
+	} else {
+		for (int i = 0; i < parts.size(); i++) {
+			if (!in_range(parts[i].x, rng)) {
+				parts[i] = std::move(parts[parts.size() - 1]);
+				parts.resize(parts.size() - 1);
+			}
+		}
+	}
+}
 real tree::compute_fluxes() {
 	real tmin = std::numeric_limits<real>::max();
 	std::vector<hpx::future<real>> futs;
@@ -122,7 +143,15 @@ real tree::compute_fluxes() {
 					auto vij = pi.v() + (pj.v() - pi.v()) * (xij - pi.x).dot(dx) / (dx.dot(dx));
 					if (abs(A) > 0.0) {
 						auto norm = A / abs(A);
-						const auto tmp = flux(pi.st, pj.st, vij, pi.V, pj.V, norm);
+						const auto dxL = other->xij - pi.x;
+						const auto dxR = other->xij - pj.x;
+						state L = pi.st / pi.V;
+						state R = pj.st / pj.V;
+						for (int dim = 0; dim < NDIM; dim++) {
+							L = L + pi.gradient[dim] * dxL[dim];
+							R = R + pj.gradient[dim] * dxR[dim];
+						}
+						const auto tmp = flux(L, R, vij, norm);
 						other->flux = tmp.first;
 						other->ret->flux = -tmp.first;
 						const real vsig = tmp.second - std::min(0.0, (pi.v() - pj.v()).dot(pi.x - pj.x) / abs(pi.x - pj.x));
@@ -444,16 +473,60 @@ void tree::compute_gradients() {
 					pi.gradient[dim][i] = 0.0;
 				}
 			}
+			state max_ngb;
+			state min_ngb;
+			state max_mid;
+			state min_mid;
+			state mid_st;
+			const auto st_i = pi.st / pi.V;
+			for (int i = 0; i < STATE_SIZE; i++) {
+				max_mid[i] = max_ngb[i] = min_mid[i] = min_ngb[i] = st_i[i];
+			}
 			for (auto &other : part.neighbors) {
 				const auto &pj = *(other->ptr);
 				for (int dim = 0; dim < NDIM; dim++) {
 					pi.gradient[dim] = pi.gradient[dim] + (pj.st / pj.V - pi.st / pi.V) * other->psi_a[dim];
 				}
 			}
+			real alpha = 1.0;
+			for (auto &other : part.neighbors) {
+				const auto &pj = *(other->ptr);
+				auto dx = pj.x - pi.x;
+				auto &xij = other->xij;
+				xij = pi.x + dx * (pi.h) / (pi.h + pj.h);
+				other->vij = pi.v() + (pj.v() - pi.v()) * (xij - pi.x).dot(dx) / (dx.dot(dx));
+				const auto st_j = pj.st / pj.V;
+				const auto mid_dx = other->xij - pi.x;
+				mid_st = pi.st / pi.V;
+				for (int dim = 0; dim < NDIM; dim++) {
+					mid_st = mid_st + pi.gradient[dim] * mid_dx[dim];
+				}
+				max_ngb = max(max_ngb, st_j);
+				min_ngb = min(min_ngb, st_j);
+				max_mid = max(max_mid, mid_st);
+				min_mid = min(min_mid, mid_st);
+			}
+			constexpr auto beta = 1.0;
+			for (int i = 0; i < STATE_SIZE; i++) {
+				const auto dmax_ngb = max_ngb[i] - st_i[i];
+				const auto dmax_mid = max_mid[i] - st_i[i];
+				const auto dmin_ngb = st_i[i] - min_ngb[i];
+				const auto dmin_mid = st_i[i] - min_mid[i];
+				if (dmax_mid == 0.0 || dmin_mid == 0.0) {
+					alpha = 1.0;
+				} else {
+					alpha = std::min(1.0, beta * std::min(dmax_ngb / dmax_mid, dmin_ngb / dmin_mid));
+				}
+				for (auto &other : part.neighbors) {
+					const auto &pj = *(other->ptr);
+					for (int dim = 0; dim < NDIM; dim++) {
+						pi.gradient[dim] = pi.gradient[dim] * alpha;
+					}
+				}
+			}
 		}
 	}
 }
-
 real tree::compute_volumes() {
 	real total = 0.0;
 	if (refined) {

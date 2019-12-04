@@ -29,7 +29,12 @@ int hpx_main(int argc, char *argv[]) {
 	feenableexcept(FE_INVALID);
 	feenableexcept(FE_OVERFLOW);
 
-	auto parts = cartesian_particle_set(1000);
+	auto parts = cartesian_particle_set(2000);
+	range box;
+	for( int dim = 0; dim < NDIM; dim++) {
+		box.first[dim] = -0.5;
+		box.second[dim] = 0.5;
+	}
 	auto t = tree::new_tree(std::move(parts));
 	t->form_tree();
 	t->compute_smoothing_lengths();
@@ -41,18 +46,21 @@ int hpx_main(int argc, char *argv[]) {
 	int iter = 0;
 	while (tm < 0.1) {
 		t->compute_interactions();
+		t->compute_gradients();
 		real dt = 0.4 * t->compute_fluxes();
 		t->compute_next_step(dt);
+		t->boundary_conditions();
 		parts = t->gather_particles();
-		t = tree::new_tree(std::move(parts));
+		t = tree::new_tree(std::move(parts),box);
 		t->form_tree();
 		t->compute_smoothing_lengths();
 		t->find_neighbors();
 		t->compute_volumes();
+		auto stats = t->compute_tree_statistics();
 		tm += dt;
-		printf( "%e %e\n", tm, dt);
+		printf("%e %e\n", tm, dt);
 		iter++;
-	//	break;
+		//	break;
 	}
 	parts = t->gather_particles();
 	t = tree::new_tree(std::move(parts));
@@ -61,7 +69,14 @@ int hpx_main(int argc, char *argv[]) {
 	t->compute_volumes();
 	auto stats = t->compute_tree_statistics();
 	t->output("parts.txt");
-		printf("Effective volume = %e\n", t->compute_volumes());
+	printf("Effective volume = %e\n", t->compute_volumes());
+	printf("nodes              = %i\n", stats.n_nodes);
+	printf("leaves             = %i\n", stats.n_leaves);
+	printf("n_parts            = %i\n", stats.n_part);
+	printf("n_parts/leaf       = %e\n", stats.n_part / double(stats.n_leaves));
+	printf("n_neighbor/n_parts = %e\n", stats.n_neighbor / double(stats.n_part));
+	printf("max_level          = %i\n", stats.max_level);
+	printf("Effective volume = %e\n", t->compute_volumes());
 	printf("nodes              = %i\n", stats.n_nodes);
 	printf("leaves             = %i\n", stats.n_leaves);
 	printf("n_parts            = %i\n", stats.n_part);

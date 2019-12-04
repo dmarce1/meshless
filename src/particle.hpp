@@ -18,17 +18,16 @@ struct particle;
 
 struct neighbor {
 	particle *ptr;
-	std::shared_ptr<hpx::lcos::local::spinlock> mtx;
 	std::shared_ptr<neighbor> ret;
 	vect area;
 	state flux;
 	vect psi_a;
+	vect xij;
+	vect vij;
 	inline neighbor(particle *_ptr) :
 			ptr(_ptr) {
-		mtx = std::make_shared<hpx::lcos::local::spinlock>();
 	}
 	neighbor() {
-		mtx = std::make_shared<hpx::lcos::local::spinlock>();
 	}
 };
 

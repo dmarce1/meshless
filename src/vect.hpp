@@ -31,9 +31,9 @@ public:
 	general_vect operator*(real r) const;
 	general_vect operator/(real r) const;
 	real dot(const general_vect &other) const;
-	bool operator!=( const general_vect& other) const {
-		for( int dim = 0; dim < NDIM; dim++ ) {
-			if( other[dim] != (*this)[dim]) {
+	bool operator!=(const general_vect &other) const {
+		for (int dim = 0; dim < NDIM; dim++) {
+			if (other[dim] != (*this)[dim]) {
 				return true;
 			}
 		}
@@ -108,6 +108,24 @@ inline real general_vect<T, N>::dot(const general_vect<T, N> &other) const {
 template<class T, int N>
 inline real abs(const general_vect<T, N> &v) {
 	return std::sqrt(v.dot(v));
+}
+
+template<class T, int N>
+inline general_vect<T, N> max(const general_vect<T, N> &a, const general_vect<T, N> &b) {
+	general_vect<T, N> c;
+	for (int i = 0; i < N; i++) {
+		c[i] = std::max(a[i], b[i]);
+	}
+	return c;
+}
+
+template<class T, int N>
+inline general_vect<T, N> min(const general_vect<T, N> &a, const general_vect<T, N> &b) {
+	general_vect<T, N> c;
+	for (int i = 0; i < N; i++) {
+		c[i] = std::min(a[i], b[i]);
+	}
+	return c;
 }
 
 using vect = general_vect<real, NDIM>;

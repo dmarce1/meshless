@@ -42,6 +42,7 @@ class tree {
 	void compute_smoothing_lengths(tree_ptr root);
 	void particles_in_range(std::vector<const particle*>&, const range&) const;
 	void form_tree(tree_ptr, int);
+	void boundary_conditions(const range&);
 
 public:
 	void initialize(const std::function<state(vect)>&);
@@ -59,6 +60,7 @@ public:
 	void form_tree();
 	void particles_in_sphere(std::vector<const particle*>&, const vect&, real) const;
 	void output(const char* filename);
+	void boundary_conditions();
 	std::vector<particle> gather_particles() const;
 
 	template<class ...Args>
