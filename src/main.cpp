@@ -31,8 +31,7 @@ int hpx_main(int argc, char *argv[]) {
 	feenableexcept(FE_INVALID);
 	feenableexcept(FE_OVERFLOW);
 
-	auto parts = random_particle_set(1000);
-	output_silo(parts,"X.silo");
+	auto parts = cartesian_particle_set(100);
 	range box;
 	for( int dim = 0; dim < NDIM; dim++) {
 		box.first[dim] = -0.5;
@@ -47,7 +46,6 @@ int hpx_main(int argc, char *argv[]) {
 	double tm = 0.0;
 	real dt = 0.0;
 	int iter = 0;
-	abort();
 	while (tm < 0.1) {
 		t->compute_interactions();
 		t->compute_gradients();
@@ -55,7 +53,6 @@ int hpx_main(int argc, char *argv[]) {
 		t->compute_next_step(dt);
 		t->boundary_conditions();
 		parts = t->gather_particles();
-	//	compute_delaunay_regions(parts);
 		t = tree::new_tree(std::move(parts),box);
 		t->form_tree();
 		t->compute_smoothing_lengths();
@@ -67,6 +64,7 @@ int hpx_main(int argc, char *argv[]) {
 		t->output("parts.txt");
 		iter++;
 	}
+	output_silo(t->gather_particles(),"X.silo");
 	parts = t->gather_particles();
 	t = tree::new_tree(std::move(parts));
 	t->form_tree();

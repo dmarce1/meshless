@@ -7,9 +7,11 @@
 
 #include "delaunay.hpp"
 #include <silo.h>
+#include <string>
 
 void output_silo(const std::vector<particle> &parts, const char *filename) {
-	DBfile *db = DBCreateReal(filename, DB_CLOBBER, DB_LOCAL, "Meshless", DB_HDF5);
+	DBfile *db = DBCreateReal(filename, DB_CLOBBER, DB_LOCAL, "Meshless",
+	DB_HDF5);
 #if( NDIM == 1)
 	const int shapetypes[1] = {[DB_ZONETYPE_BEAM};
 #elif( NDIM ==2)
@@ -40,8 +42,30 @@ void output_silo(const std::vector<particle> &parts, const char *filename) {
 			coords[dim][i] = parts[i].x[dim];
 		}
 	}
-	DBPutZonelist2(db, "zonelist", nzones, NDIM, node_list.data(), node_list.size(), 0, 0, 0, shapetypes, shapesize, shapecount, 1, NULL);
+	DBPutZonelist2(db, "zonelist", nzones, NDIM, node_list.data(), node_list.size(), 0, 0, 0, shapetypes, shapesize, shapecount, 1,
+	NULL);
 	DBPutUcdmesh(db, "mesh", NDIM, coordnames, coords, nnodes, nzones, "zonelist", NULL, DB_DOUBLE, NULL);
+	std::vector<real> rho;
+	std::vector<real> energy;
+	std::array<std::vector<real>, NDIM> mom;
+	rho.reserve(nnodes);
+	energy.reserve(nnodes);
+	for (int dim = 0; dim < NDIM; dim++) {
+		mom[dim].reserve(nnodes);
+	}
+	for (const auto& pi : parts) {
+		rho.push_back(pi.st.mass() / pi.V);
+		energy.push_back(pi.st.energy() / pi.V);
+		for (int dim = 0; dim < NDIM; dim++) {
+			mom[dim].push_back(pi.st.momentum(dim)/ pi.V) ;
+		}
+	}
+	DBPutUcdvar1(db, "density", "mesh", rho.data(), nnodes, NULL, 0, DB_DOUBLE, DB_NODECENT, NULL);
+	DBPutUcdvar1(db, "energy", "mesh", energy.data(), nnodes, NULL, 0, DB_DOUBLE, DB_NODECENT, NULL);
+	for (int dim = 0; dim < NDIM; dim++) {
+		std::string mom_name = std::string() + char('x' + char(dim)) + "_momentum";
+		DBPutUcdvar1(db, mom_name.c_str(), "mesh", mom[dim].data(), nnodes, NULL, 0, DB_DOUBLE, DB_NODECENT, NULL);
+	}
 	for (int dim = 0; dim < NDIM; dim++) {
 		delete[] coordnames[dim];
 		delete[] coords[dim];
