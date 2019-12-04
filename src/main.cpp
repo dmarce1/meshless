@@ -31,7 +31,7 @@ int hpx_main(int argc, char *argv[]) {
 	feenableexcept(FE_INVALID);
 	feenableexcept(FE_OVERFLOW);
 
-	auto parts = random_particle_set(10000);
+	auto parts = random_particle_set(1000);
 	output_silo(parts,"X.silo");
 	range box;
 	for( int dim = 0; dim < NDIM; dim++) {
