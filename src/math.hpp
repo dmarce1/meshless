@@ -9,6 +9,7 @@
 #define MATH_HPP_
 
 #include "vect.hpp"
+#include <limits>
 
 using range = std::pair<vect,vect>;
 
@@ -22,7 +23,9 @@ real bspline(real r);
 real d_bspline_dr(real r);
 real W_norm(real h);
 real dW_norm_dh(real h);
-inline real box_volume(const range &R);
+real box_volume(const range &R);
+bool matrix_inverse(const std::array<vect, NDIM> &A, std::array<vect, NDIM> &Ainv);
+real condition_number(const std::array<vect, NDIM> &A, std::array<vect, NDIM> &Ainv);
 
 inline bool in_range(const vect &x, const range &r) {
 	for (int dim = 0; dim < NDIM; dim++) {
@@ -111,36 +114,6 @@ inline real rand_unit_box() {
 	return x - 0.5;
 }
 
-inline std::array<vect, NDIM> matrix_inverse(const std::array<vect, NDIM> &A) {
-	std::array<vect, NDIM> Ainv;
-#if(NDIM==1)
-	Ainv[0][0] = 1.0 / A[0][0];
-#else
-#if(NDIM==2)
-	real det = A[0][0] * A[1][1] - A[1][0] * A[0][1];
-	const real detinv = 1.0 / detinv;
-	Ainv[0][0] = +A[1][1] * detinv;
-	Ainv[0][1] = -A[1][0] * detinv;
-	Ainv[1][0] = -A[0][1] * detinv;
-	Ainv[1][1] = +A[0][0] * detinv;
-#else
-	real det = A[0][0] * (A[1][1] * A[2][2] - A[2][1] * A[1][2]);
-	det /**/-= A[0][1] * (A[1][0] * A[2][2] - A[2][0] * A[1][2]);
-	det /**/+= A[0][2] * (A[1][0] * A[2][1] - A[2][0] * A[1][1]);
-	const real detinv = 1.0 / det;
-	Ainv[0][0] = (-A[1][2] * A[2][1] + A[1][1] * A[2][2]) * detinv;
-	Ainv[0][1] = (+A[0][2] * A[2][1] - A[0][1] * A[2][2]) * detinv;
-	Ainv[0][2] = (-A[0][2] * A[1][1] + A[0][1] * A[1][2]) * detinv;
-	Ainv[1][0] = (+A[1][2] * A[2][0] - A[1][0] * A[2][2]) * detinv;
-	Ainv[1][1] = (-A[0][2] * A[2][0] + A[0][0] * A[2][2]) * detinv;
-	Ainv[1][2] = (+A[0][2] * A[1][0] - A[0][0] * A[1][2]) * detinv;
-	Ainv[2][0] = (-A[1][1] * A[2][0] + A[1][0] * A[2][1]) * detinv;
-	Ainv[2][1] = (+A[0][1] * A[2][0] - A[0][0] * A[2][1]) * detinv;
-	Ainv[2][2] = (-A[0][1] * A[1][0] + A[0][0] * A[1][1]) * detinv;
-#endif
-#endif
-	return Ainv;
-}
 
 inline real distance(const vect &a, const vect &b) {
 	real d = 0.0;
@@ -149,6 +122,5 @@ inline real distance(const vect &a, const vect &b) {
 	}
 	return std::sqrt(d);
 }
-
 #endif /* MATH_HPP_ */
 

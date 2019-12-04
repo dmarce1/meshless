@@ -29,7 +29,7 @@ int hpx_main(int argc, char *argv[]) {
 	feenableexcept(FE_INVALID);
 	feenableexcept(FE_OVERFLOW);
 
-	auto parts = cartesian_particle_set(2000);
+	auto parts = cartesian_particle_set(100);
 	range box;
 	for( int dim = 0; dim < NDIM; dim++) {
 		box.first[dim] = -0.5;
@@ -59,6 +59,7 @@ int hpx_main(int argc, char *argv[]) {
 		auto stats = t->compute_tree_statistics();
 		tm += dt;
 		printf("%e %e\n", tm, dt);
+		t->output("parts.txt");
 		iter++;
 		//	break;
 	}

@@ -74,10 +74,12 @@ void tree::compute_interactions() {
 					}
 				}
 			}
-			const auto B = matrix_inverse(E);
+			decltype(E) B;
+			const auto Ncond = condition_number(E, B);
+//			printf( "%e\n", Ncond);
 			for (auto &other : part.neighbors) {
 				const auto &pj = *(other->ptr);
-				const auto psi_j = W(abs(pi.x - pj.x), pi.h) / pi.V;
+				const auto psi_j = W(abs(pi.x - pj.x), pi.h) * pi.V;
 				real psi_a_j;
 				for (int n = 0; n < NDIM; n++) {
 					psi_a_j = 0.0;
@@ -86,6 +88,7 @@ void tree::compute_interactions() {
 					}
 					other->psi_a[n] = psi_a_j;
 					const real da = part.V * psi_a_j;
+		//			printf( "%e %e\n", part.V, psi_j);
 					other->area[n] += da;
 					other->ret->area[n] -= da;
 				}
@@ -148,8 +151,8 @@ real tree::compute_fluxes() {
 						state L = pi.st / pi.V;
 						state R = pj.st / pj.V;
 						for (int dim = 0; dim < NDIM; dim++) {
-							L = L + pi.gradient[dim] * dxL[dim];
-							R = R + pj.gradient[dim] * dxR[dim];
+//							L = L + pi.gradient[dim] * dxL[dim];
+//							R = R + pj.gradient[dim] * dxR[dim];
 						}
 						const auto tmp = flux(L, R, vij, norm);
 						other->flux = tmp.first;
@@ -210,9 +213,13 @@ void tree::compute_next_step(real dt) {
 			auto &pi = part;
 			for (auto &other : part.neighbors) {
 				const auto area = abs(other->area);
-				pi.st = pi.st - other->flux * dt * area;
+				pi.st = pi.st - other->flux * dt * area * 0.5;
 			}
 			pi.x = pi.x + pi.v() * dt;
+			for (auto &other : part.neighbors) {
+				const auto area = abs(other->area);
+				pi.st = pi.st - other->flux * dt * area * 0.5;
+			}
 		}
 	}
 }

@@ -8,6 +8,8 @@
 #ifndef STATE_HPP_
 #define STATE_HPP_
 
+#include <cassert>
+
 static int constexpr STATE_SIZE = 2 + NDIM;
 static double constexpr fgamma = 7.0 / 5.0;
 
@@ -23,6 +25,7 @@ struct state: public general_vect<real, STATE_SIZE> {
 		return *this;
 	}
 	real mass() const {
+		assert( (*this)[0] > 0.0);
 		return (*this)[0];
 	}
 	real& mass() {
