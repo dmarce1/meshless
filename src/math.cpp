@@ -39,7 +39,7 @@ bool matrix_inverse(const std::array<vect, NDIM> &A, std::array<vect, NDIM> &Ain
 	if (det == 0.0) {
 		return false;
 	}
-	const real detinv = 1.0 / detinv;
+	const real detinv = 1.0 / det;
 	Ainv[0][0] = +A[1][1] * detinv;
 	Ainv[0][1] = -A[0][1] * detinv;
 	Ainv[1][0] = -A[1][0] * detinv;

@@ -67,7 +67,7 @@ void tree::compute_interactions() {
 			const auto &pi = part;
 			for (auto &other : part.neighbors) {
 				const auto &pj = *(other->ptr);
-				const auto psi_j = W(abs(pi.x - pj.x), pi.h) / pi.V;
+				const auto psi_j = W(abs(pi.x - pj.x), pi.h) * pi.V;
 				for (int n = 0; n < NDIM; n++) {
 					for (int m = 0; m < NDIM; m++) {
 						E[n][m] += (pj.x[n] - pi.x[n]) * (pj.x[m] - pi.x[m]) * psi_j;
