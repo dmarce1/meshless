@@ -12,6 +12,8 @@
 #include <hpx/include/async.hpp>
 #include <hpx/include/future.hpp>
 
+#define Ncond_crit (100)
+
 #if(NDIM == 1 )
 #define C 1
 #define NGB 2
@@ -64,7 +66,7 @@ void tree::compute_interactions() {
 					E[n][m] = 0.0;
 				}
 			}
-			const auto &pi = part;
+			auto &pi = part;
 			for (auto &other : part.neighbors) {
 				const auto &pj = *(other->ptr);
 				const auto psi_j = W(abs(pi.x - pj.x), pi.h) * pi.V;
@@ -75,8 +77,7 @@ void tree::compute_interactions() {
 				}
 			}
 			decltype(E) B;
-			const auto Ncond = condition_number(E, B);
-//			printf( "%e\n", Ncond);
+			pi.Ncond = condition_number(E, B);
 			for (auto &other : part.neighbors) {
 				const auto &pj = *(other->ptr);
 				const auto psi_j = W(abs(pi.x - pj.x), pi.h) * pi.V;
@@ -88,7 +89,7 @@ void tree::compute_interactions() {
 					}
 					other->psi_a[n] = psi_a_j;
 					const real da = part.V * psi_a_j;
-		//			printf( "%e %e\n", part.V, psi_j);
+					//			printf( "%e %e\n", part.V, psi_j);
 					other->area[n] += da;
 					other->ret->area[n] -= da;
 				}
@@ -151,8 +152,8 @@ real tree::compute_fluxes() {
 						state L = pi.st / pi.V;
 						state R = pj.st / pj.V;
 						for (int dim = 0; dim < NDIM; dim++) {
-//							L = L + pi.gradient[dim] * dxL[dim];
-//							R = R + pj.gradient[dim] * dxR[dim];
+							L = L + pi.gradient[dim] * dxL[dim];
+							R = R + pj.gradient[dim] * dxR[dim];
 						}
 						const auto tmp = flux(L, R, vij, norm);
 						other->flux = tmp.first;
@@ -513,7 +514,7 @@ void tree::compute_gradients() {
 				max_mid = max(max_mid, mid_st);
 				min_mid = min(min_mid, mid_st);
 			}
-			constexpr auto beta = 1.0;
+			const auto beta = std::max(1.0, std::min(1.5, Ncond_crit / pi.Ncond));
 			for (int i = 0; i < STATE_SIZE; i++) {
 				const auto dmax_ngb = max_ngb[i] - st_i[i];
 				const auto dmax_mid = max_mid[i] - st_i[i];

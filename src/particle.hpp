@@ -36,6 +36,7 @@ struct particle {
 	real h;
 	real V;
 	state st;
+	real Ncond;
 	std::array<state,NDIM> gradient;
 	real rho() const {
 		return st.mass() / V;
