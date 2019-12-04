@@ -49,10 +49,14 @@ tree::tree(std::vector<particle> &&parts) :
 }
 
 void tree::compute_interactions() {
+	std::vector<hpx::future<void>> futs;
 	if (refined) {
 		for (int ci = 0; ci < NCHILD; ci++) {
-			children[ci]->compute_interactions();
+			futs.push_back(hpx::async([this, ci]() {
+				children[ci]->compute_interactions();
+			}));
 		}
+		hpx::wait_all(futs);
 	} else {
 		for (auto &part : parts) {
 			std::array<vect, NDIM> E;
@@ -75,7 +79,6 @@ void tree::compute_interactions() {
 			for (auto &other : part.neighbors) {
 				const auto &pj = *(other->ptr);
 				const auto psi_j = W(abs(pi.x - pj.x), pi.h) / pi.V;
-
 				real psi_a_j;
 				for (int n = 0; n < NDIM; n++) {
 					psi_a_j = 0.0;
@@ -94,38 +97,44 @@ void tree::compute_interactions() {
 
 real tree::compute_fluxes() {
 	real tmin = std::numeric_limits<real>::max();
+	std::vector<hpx::future<real>> futs;
 	if (refined) {
 		for (int ci = 0; ci < NCHILD; ci++) {
-			const real this_t = children[ci]->compute_fluxes();
-			tmin = std::min(this_t, tmin);
+			futs.push_back(hpx::async([this, ci]() {
+				return children[ci]->compute_fluxes();
+			}));
+		}
+		for (int ci = 0; ci < NCHILD; ci++) {
+			tmin = std::min(tmin, futs[ci].get());
 		}
 	} else {
 		for (auto &part : parts) {
-			real vsig = 0.0;
 			auto &pi = part;
 			for (auto &other : part.neighbors) {
 				auto &pj = *(other->ptr);
-				vect A;
-				for (int dim = 0; dim < NDIM; dim++) {
-					A[dim] = other->area[dim];
-				}
-				auto dx = pj.x - pi.x;
-				auto xij = pi.x + dx * (pi.h) / (pi.h + pj.h);
-				auto vij = pi.v() + (pj.v() - pi.v()) * (xij - pi.x).dot(dx) / (dx.dot(dx));
-				if (abs(A) > 0.0) {
-					auto norm = A / abs(A);
-					const auto tmp = flux(pi.st, pj.st, vij, pi.V, pj.V, norm);
-					other->flux = tmp.first;
-					other->ret->flux = -tmp.first;
-					vsig = std::max(vsig, tmp.second - std::min(0.0, (pi.v() - pj.v()).dot(pi.x - pj.x) / abs(pi.x - pj.x)));
-				} else {
-					for (int f = 0; f < STATE_SIZE; f++) {
-						other->flux[f] = 0.0;
-						other->ret->flux[f] = 0.0;
+				if (&pj > &pi) {
+					vect A;
+					for (int dim = 0; dim < NDIM; dim++) {
+						A[dim] = other->area[dim];
+					}
+					auto dx = pj.x - pi.x;
+					auto xij = pi.x + dx * (pi.h) / (pi.h + pj.h);
+					auto vij = pi.v() + (pj.v() - pi.v()) * (xij - pi.x).dot(dx) / (dx.dot(dx));
+					if (abs(A) > 0.0) {
+						auto norm = A / abs(A);
+						const auto tmp = flux(pi.st, pj.st, vij, pi.V, pj.V, norm);
+						other->flux = tmp.first;
+						other->ret->flux = -tmp.first;
+						const real vsig = tmp.second - std::min(0.0, (pi.v() - pj.v()).dot(pi.x - pj.x) / abs(pi.x - pj.x));
+						tmin = std::min(tmin, pi.h / vsig);
+					} else {
+						for (int f = 0; f < STATE_SIZE; f++) {
+							other->flux[f] = 0.0;
+							other->ret->flux[f] = 0.0;
+						}
 					}
 				}
 			}
-			tmin = std::min(tmin, pi.h / vsig);
 		}
 	}
 	return tmin;
@@ -160,9 +169,13 @@ void tree::output(const char *filename) {
 
 void tree::compute_next_step(real dt) {
 	if (refined) {
+		std::vector<hpx::future<void>> futs;
 		for (int ci = 0; ci < NCHILD; ci++) {
-			children[ci]->compute_next_step(dt);
+			futs.push_back(hpx::async([this, ci, dt]() {
+				children[ci]->compute_next_step(dt);
+			}));
 		}
+		hpx::wait_all(futs);
 	} else {
 		for (auto &part : parts) {
 			auto &pi = part;
@@ -189,8 +202,14 @@ void tree::initialize(const std::function<state(vect)> &f) {
 std::vector<particle> tree::gather_particles() const {
 	std::vector<particle> return_parts;
 	if (refined) {
+		std::vector<hpx::future<std::vector<particle>>> futs;
 		for (int ci = 0; ci < NCHILD; ci++) {
-			auto tmp = children[ci]->gather_particles();
+			futs.push_back(hpx::async([this, ci]() {
+				return children[ci]->gather_particles();
+			}));
+		}
+		for (int ci = 0; ci < NCHILD; ci++) {
+			auto tmp = futs[ci].get();
 			return_parts.insert(return_parts.end(), tmp.begin(), tmp.end());
 		}
 	} else {
@@ -200,10 +219,14 @@ std::vector<particle> tree::gather_particles() const {
 }
 
 void tree::find_neighbors() {
+	std::vector<hpx::future<void>> futs;
 	if (refined) {
 		for (int ci = 0; ci < NCHILD; ci++) {
-			children[ci]->find_neighbors();
+			futs.push_back(hpx::async([this,ci] {
+				children[ci]->find_neighbors();
+			}));
 		}
+		hpx::wait_all(futs);
 	} else {
 		for (auto &part : parts) {
 			for (auto &this_n : part.neighbors) {
@@ -213,16 +236,28 @@ void tree::find_neighbors() {
 				for (auto &other : others) {
 					if (ptr == other->ptr) {
 						found = true;
-						this_n->ret = other;
-						other->ret = this_n;
+						{
+							std::lock_guard<hpx::lcos::local::spinlock> lock(*this_n->mtx);
+							this_n->ret = other;
+						}
+						{
+							std::lock_guard<hpx::lcos::local::spinlock> lock(*other->mtx);
+							other->ret = this_n;
+						}
 						break;
 					}
 				}
 				if (!found) {
 					others.push_back(std::make_shared<neighbor>(ptr));
 					auto &other = others[others.size() - 1];
-					this_n->ret = other;
-					other->ret = this_n;
+					{
+						std::lock_guard<hpx::lcos::local::spinlock> lock(*this_n->mtx);
+						this_n->ret = other;
+					}
+					{
+						std::lock_guard<hpx::lcos::local::spinlock> lock(*other->mtx);
+						other->ret = this_n;
+					}
 				}
 			}
 		}
@@ -279,10 +314,14 @@ void tree::make_tree(std::vector<particle> &&_parts) {
 			std::sort(ptrs.begin(), ptrs.end(), [dim](particle *a, particle *b) {
 				return a->x[dim] < b->x[dim];
 			});
-//			mid[dim] = ptrs[sz / 2]->x[dim];
-			mid[dim] = (box.first[dim] + box.second[dim]) / 2.0;
+			if (sz % 2 == 0) {
+				mid[dim] = (ptrs[sz / 2]->x[dim] + ptrs[sz / 2 - 1]->x[dim]) * 0.5;
+			} else {
+				mid[dim] = ptrs[sz / 2]->x[dim];
+			}
 		}
 		range this_box;
+		std::vector<hpx::future<tree_ptr>> futs;
 		for (int n = 0; n < NCHILD; n++) {
 			int m = n;
 			for (int dim = 0; dim < NDIM; dim++) {
@@ -307,7 +346,12 @@ void tree::make_tree(std::vector<particle> &&_parts) {
 					_parts.resize(sz);
 				}
 			}
-			children[n] = new_tree(std::move(cparts), this_box);
+			futs.push_back(hpx::async([this_box](std::vector<particle>&& cparts) {
+				return new_tree(std::move(cparts), this_box);
+			}, std::move(cparts)));
+		}
+		for( int ci = 0; ci < NCHILD; ci++) {
+			children[ci] = futs[ci].get();
 		}
 	}
 
@@ -320,10 +364,14 @@ void tree::form_tree() {
 void tree::form_tree(tree_ptr _parent, int _level) {
 	level = _level;
 	parent = _parent;
+	std::vector<hpx::future<void>> futs;
 	if (refined) {
 		for (int ci = 0; ci < NCHILD; ci++) {
-			children[ci]->form_tree(self, level + 1);
+			futs.push_back(hpx::async([this,ci]() {
+				children[ci]->form_tree(self, level + 1);
+			}));
 		}
+		hpx::wait_all(futs);
 	}
 }
 
@@ -423,10 +471,16 @@ void tree::compute_gradients() {
 }
 
 real tree::compute_volumes() {
+	std::vector<hpx::future<real>> futs;
 	real total = 0.0;
 	if (refined) {
 		for (int ci = 0; ci < NCHILD; ci++) {
-			total += children[ci]->compute_volumes();
+			futs.push_back(hpx::async([this,ci]() {
+				return children[ci]->compute_volumes();
+			}));
+		}
+		for( int ci = 0; ci < NCHILD; ci++) {
+			total += futs[ci].get();
 		}
 	} else {
 		for (auto &part : parts) {

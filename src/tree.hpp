@@ -30,7 +30,7 @@ struct tree_stats {
 
 class tree {
 
-	static constexpr int NMAX = 100;
+	static constexpr int NMAX = 256;
 	std::array<tree_ptr, NCHILD> children;
 	tree_ptr parent;
 	tree_ptr self;
