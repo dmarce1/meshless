@@ -9,6 +9,7 @@
 #include <fenv.h>
 #include <hpx/hpx_init.hpp>
 #include "delaunay.hpp"
+#include "silo.hpp"
 
 state sod(const vect &x) {
 	state U;
@@ -30,7 +31,8 @@ int hpx_main(int argc, char *argv[]) {
 	feenableexcept(FE_INVALID);
 	feenableexcept(FE_OVERFLOW);
 
-	auto parts = cartesian_particle_set(100);
+	auto parts = random_particle_set(10000);
+	output_silo(parts,"X.silo");
 	range box;
 	for( int dim = 0; dim < NDIM; dim++) {
 		box.first[dim] = -0.5;
@@ -45,6 +47,7 @@ int hpx_main(int argc, char *argv[]) {
 	double tm = 0.0;
 	real dt = 0.0;
 	int iter = 0;
+	abort();
 	while (tm < 0.1) {
 		t->compute_interactions();
 		t->compute_gradients();

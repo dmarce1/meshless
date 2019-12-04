@@ -175,7 +175,12 @@ real tree::compute_fluxes() {
 
 void tree::output(const char *filename) {
 	if (level == 0) {
-		system((std::string("rm ") + filename).c_str());
+		FILE *fp = fopen(filename, "wt");
+		if (fp == NULL) {
+			printf("System error on line %i of %s\n", __LINE__, __FILE__);
+			abort();
+		}
+		fclose(fp);
 	}
 	if (refined) {
 		for (int ci = 0; ci < NCHILD; ci++) {
@@ -194,7 +199,7 @@ void tree::output(const char *filename) {
 			for (int dim = 0; dim < NDIM; dim++) {
 				fprintf(fp, "%e ", part.v()[dim]);
 			}
-			fprintf(fp, "%i\n", part.neighbors.size());
+			fprintf(fp, "%i\n", int(part.neighbors.size()));
 		}
 		fclose(fp);
 	}

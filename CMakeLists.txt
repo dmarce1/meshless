@@ -27,6 +27,7 @@ set(source_files
     src/math.cpp
 	src/particle.cpp
 	src/tree.cpp
+	src/silo.cpp
 )
 
 set(header_files
@@ -35,6 +36,7 @@ set(header_files
 	src/math.hpp  
 	src/particle.hpp  
 	src/real.hpp  
+	src/silo.hpp
 	src/tree.hpp  
 	src/vect.hpp
 )

@@ -6,6 +6,7 @@
  */
 
 #include "delaunay.hpp"
+#include <cassert>
 
 std::vector<delauny_region> compute_delaunay_regions(const std::vector<particle> &parts) {
 	std::vector<delauny_region> regions;
@@ -35,20 +36,32 @@ std::vector<delauny_region> compute_delaunay_regions(const std::vector<particle>
 		fprintf(fp, "\n");
 	}
 	fclose(fp);
-	system("qdelaunay i Qt < points.dat > delaunay.dat");
-	system("rm points.dat");
-	fp = fopen("delaunay.dat", "rt");
+	if (system("qdelaunay i Qt < points.dat > delaunay.dat") != 0) {
+		printf("qhull must be installed\n");
+		abort();
+	}
+	int dsz;
 	constexpr auto buffer_size = 1024;
 	static char buffer[buffer_size + 1];
-	fgets(buffer, buffer_size, fp);
-	const int dsz = std::atoi(buffer);
-	regions.resize(dsz);
-	for( int i = 0; i < dsz; i++) {
-		fgets(buffer, buffer_size, fp);
+	fp = fopen("delaunay.dat", "rt");
+	if (fgets(buffer, buffer_size, fp) == 0) {
+		assert(false);
+		goto SYSTEM_ERROR;
+	}
+	dsz = std::atoi(buffer);
+	regions.reserve(dsz);
+	for (int i = 0; i < dsz; i++) {
+		if (fgets(buffer, buffer_size, fp) == 0) {
+			assert(false);
+			goto SYSTEM_ERROR;
+		}
 		delauny_region r;
 		char *ptr = buffer;
 		for (int n = 0; n < NDIM + 1; n++) {
 			r[n] = std::atoi(ptr);
+			while (std::isspace(*ptr)) {
+				ptr++;
+			}
 			while (!std::isspace(*ptr)) {
 				ptr++;
 			}
@@ -56,6 +69,8 @@ std::vector<delauny_region> compute_delaunay_regions(const std::vector<particle>
 		regions.push_back(r);
 	}
 	fclose(fp);
-#endif
 	return regions;
+#endif
+	SYSTEM_ERROR: printf("Problem with Delauay\n");
+	abort();
 }
