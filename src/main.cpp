@@ -8,6 +8,7 @@
 #include "tree.hpp"
 #include <fenv.h>
 #include <hpx/hpx_init.hpp>
+#include "delaunay.hpp"
 
 state sod(const vect &x) {
 	state U;
@@ -51,6 +52,7 @@ int hpx_main(int argc, char *argv[]) {
 		t->compute_next_step(dt);
 		t->boundary_conditions();
 		parts = t->gather_particles();
+	//	compute_delaunay_regions(parts);
 		t = tree::new_tree(std::move(parts),box);
 		t->form_tree();
 		t->compute_smoothing_lengths();
@@ -61,7 +63,6 @@ int hpx_main(int argc, char *argv[]) {
 		printf("%e %e\n", tm, dt);
 		t->output("parts.txt");
 		iter++;
-		//	break;
 	}
 	parts = t->gather_particles();
 	t = tree::new_tree(std::move(parts));

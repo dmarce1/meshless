@@ -17,20 +17,20 @@
 
 template<class T, int N>
 class general_vect {
-	std::array<real, N> v;
+	std::array<T, N> v;
 public:
 	general_vect() = default;
 	general_vect(std::array<real, N> a) :
 			v(a) {
 	}
-	real& operator[](int i);
-	real operator[](int i) const;
+	T& operator[](int i);
+	T operator[](int i) const;
 	general_vect operator-() const;
 	general_vect operator-(const general_vect &other) const;
 	general_vect operator+(const general_vect &other) const;
-	general_vect operator*(real r) const;
-	general_vect operator/(real r) const;
-	real dot(const general_vect &other) const;
+	general_vect operator*(T r) const;
+	general_vect operator/(T r) const;
+	T dot(const general_vect &other) const;
 	bool operator!=(const general_vect &other) const {
 		for (int dim = 0; dim < NDIM; dim++) {
 			if (other[dim] != (*this)[dim]) {
@@ -42,12 +42,12 @@ public:
 };
 
 template<class T, int N>
-inline real& general_vect<T, N>::operator[](int i) {
+inline T& general_vect<T, N>::operator[](int i) {
 	return v[i];
 }
 
 template<class T, int N>
-inline real general_vect<T, N>::operator[](int i) const {
+inline T general_vect<T, N>::operator[](int i) const {
 	return v[i];
 }
 
@@ -79,7 +79,7 @@ inline general_vect<T, N> general_vect<T, N>::operator+(const general_vect<T, N>
 }
 
 template<class T, int N>
-inline general_vect<T, N> general_vect<T, N>::operator*(real r) const {
+inline general_vect<T, N> general_vect<T, N>::operator*(T r) const {
 	general_vect<T, N> result;
 	for (int dim = 0; dim < N; dim++) {
 		result[dim] = v[dim] * r;
@@ -88,7 +88,7 @@ inline general_vect<T, N> general_vect<T, N>::operator*(real r) const {
 }
 
 template<class T, int N>
-inline general_vect<T, N> general_vect<T, N>::operator/(real r) const {
+inline general_vect<T, N> general_vect<T, N>::operator/(T r) const {
 	general_vect<T, N> result;
 	for (int dim = 0; dim < N; dim++) {
 		result[dim] = v[dim] / r;
@@ -97,8 +97,8 @@ inline general_vect<T, N> general_vect<T, N>::operator/(real r) const {
 }
 
 template<class T, int N>
-inline real general_vect<T, N>::dot(const general_vect<T, N> &other) const {
-	real result = 0.0;
+inline T general_vect<T, N>::dot(const general_vect<T, N> &other) const {
+	T result = 0.0;
 	for (int dim = 0; dim < N; dim++) {
 		result += v[dim] * other[dim];
 	}
@@ -106,7 +106,7 @@ inline real general_vect<T, N>::dot(const general_vect<T, N> &other) const {
 }
 
 template<class T, int N>
-inline real abs(const general_vect<T, N> &v) {
+inline T abs(const general_vect<T, N> &v) {
 	return std::sqrt(v.dot(v));
 }
 
