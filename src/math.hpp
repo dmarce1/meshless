@@ -114,7 +114,6 @@ inline real rand_unit_box() {
 	return x - 0.5;
 }
 
-
 inline real distance(const vect &a, const vect &b) {
 	real d = 0.0;
 	for (int dim = 0; dim < NDIM; dim++) {
@@ -122,5 +121,20 @@ inline real distance(const vect &a, const vect &b) {
 	}
 	return std::sqrt(d);
 }
+
+#if(NDIM==3)
+inline vect cross( const vect& a, const vect& b) {
+	vect c;
+	c[0] = +a[1] * b[2] - a[2] * b[1];
+	c[1] = -a[0] * b[2] + a[2] * b[0];
+	c[2] = +a[0] * b[1] - a[1] * b[2];
+	return c;
+}
+
+inline real triple_product(const vect &a, const vect &b, const vect &c) {
+	return a.dot(cross(b, c));
+}
+#endif
+
 #endif /* MATH_HPP_ */
 

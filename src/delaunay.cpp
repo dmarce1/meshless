@@ -66,6 +66,8 @@ std::vector<delauny_region> compute_delaunay_regions(const std::vector<particle>
 				ptr++;
 			}
 		}
+#if(NDIM==3)
+#endif
 		regions.push_back(r);
 	}
 	fclose(fp);

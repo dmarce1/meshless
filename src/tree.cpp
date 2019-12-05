@@ -9,9 +9,6 @@
 #include <cmath>
 #include <cstdlib>
 
-#include <hpx/include/async.hpp>
-#include <hpx/include/future.hpp>
-
 #define Ncond_crit (100)
 
 #if(NDIM == 1 )
@@ -50,14 +47,10 @@ tree::tree(std::vector<particle> &&parts) :
 }
 
 void tree::compute_interactions() {
-	std::vector<hpx::future<void>> futs;
 	if (refined) {
 		for (int ci = 0; ci < NCHILD; ci++) {
-			futs.push_back(hpx::async([this, ci]() {
-				children[ci]->compute_interactions();
-			}));
+			children[ci]->compute_interactions();
 		}
-		hpx::wait_all(futs);
 	} else {
 		for (auto &part : parts) {
 			std::array<vect, NDIM> E;
@@ -103,14 +96,10 @@ void tree::boundary_conditions() {
 }
 
 void tree::boundary_conditions(const range &rng) {
-	std::vector<hpx::future<void>> futs;
 	if (refined) {
 		for (int ci = 0; ci < NCHILD; ci++) {
-			futs.push_back(hpx::async([this, ci, rng]() {
-				children[ci]->boundary_conditions(rng);
-			}));
+			children[ci]->boundary_conditions(rng);
 		}
-		hpx::wait_all(futs);
 	} else {
 		for (int i = 0; i < parts.size(); i++) {
 			if (!in_range(parts[i].x, rng)) {
@@ -122,15 +111,10 @@ void tree::boundary_conditions(const range &rng) {
 }
 real tree::compute_fluxes() {
 	real tmin = std::numeric_limits<real>::max();
-	std::vector<hpx::future<real>> futs;
 	if (refined) {
 		for (int ci = 0; ci < NCHILD; ci++) {
-			futs.push_back(hpx::async([this, ci]() {
-				return children[ci]->compute_fluxes();
-			}));
-		}
-		for (int ci = 0; ci < NCHILD; ci++) {
-			tmin = std::min(tmin, futs[ci].get());
+			const auto this_tmin = children[ci]->compute_fluxes();
+			tmin = std::min(tmin, this_tmin);
 		}
 	} else {
 		for (auto &part : parts) {
@@ -145,7 +129,7 @@ real tree::compute_fluxes() {
 					auto dx = pj.x - pi.x;
 					auto xij = pi.x + dx * (pi.h) / (pi.h + pj.h);
 					auto vij = pi.v() + (pj.v() - pi.v()) * (xij - pi.x).dot(dx) / (dx.dot(dx));
-					if (abs(A) > 0.0) {
+					if (abs(A) != 0.0) {
 						auto norm = A / abs(A);
 						const auto dxL = other->xij - pi.x;
 						const auto dxR = other->xij - pj.x;
@@ -161,9 +145,9 @@ real tree::compute_fluxes() {
 						const real vsig = tmp.second - std::min(0.0, (pi.v() - pj.v()).dot(pi.x - pj.x) / abs(pi.x - pj.x));
 						tmin = std::min(tmin, pi.h / vsig);
 					} else {
-						for (int f = 0; f < STATE_SIZE; f++) {
-							other->flux[f] = 0.0;
-							other->ret->flux[f] = 0.0;
+						for (int i = 0; i < STATE_SIZE; i++) {
+							other->flux[i] = 0.0;
+							other->ret->flux[i] = 0.0;
 						}
 					}
 				}
@@ -207,13 +191,9 @@ void tree::output(const char *filename) {
 
 void tree::compute_next_step(real dt) {
 	if (refined) {
-		std::vector<hpx::future<void>> futs;
 		for (int ci = 0; ci < NCHILD; ci++) {
-			futs.push_back(hpx::async([this, ci, dt]() {
-				children[ci]->compute_next_step(dt);
-			}));
+			children[ci]->compute_next_step(dt);
 		}
-		hpx::wait_all(futs);
 	} else {
 		for (auto &part : parts) {
 			auto &pi = part;
@@ -244,14 +224,8 @@ void tree::initialize(const std::function<state(vect)> &f) {
 std::vector<particle> tree::gather_particles() const {
 	std::vector<particle> return_parts;
 	if (refined) {
-		std::vector<hpx::future<std::vector<particle>>> futs;
 		for (int ci = 0; ci < NCHILD; ci++) {
-			futs.push_back(hpx::async([this, ci]() {
-				return children[ci]->gather_particles();
-			}));
-		}
-		for (int ci = 0; ci < NCHILD; ci++) {
-			auto tmp = futs[ci].get();
+			const auto tmp = children[ci]->gather_particles();
 			return_parts.insert(return_parts.end(), tmp.begin(), tmp.end());
 		}
 	} else {
@@ -347,9 +321,8 @@ void tree::make_tree(std::vector<particle> &&_parts) {
 			}
 		}
 		range this_box;
-		std::vector<hpx::future<tree_ptr>> futs;
-		for (int n = 0; n < NCHILD; n++) {
-			int m = n;
+		for (int ci = 0; ci < NCHILD; ci++) {
+			int m = ci;
 			for (int dim = 0; dim < NDIM; dim++) {
 				if (m & 1) {
 					this_box.first[dim] = mid[dim];
@@ -372,12 +345,7 @@ void tree::make_tree(std::vector<particle> &&_parts) {
 					_parts.resize(sz);
 				}
 			}
-			futs.push_back(hpx::async([this_box](std::vector<particle> &&cparts) {
-				return new_tree(std::move(cparts), this_box);
-			}, std::move(cparts)));
-		}
-		for (int ci = 0; ci < NCHILD; ci++) {
-			children[ci] = futs[ci].get();
+			children[ci] = new_tree(std::move(cparts), this_box);
 		}
 	}
 
@@ -390,14 +358,10 @@ void tree::form_tree() {
 void tree::form_tree(tree_ptr _parent, int _level) {
 	level = _level;
 	parent = _parent;
-	std::vector<hpx::future<void>> futs;
 	if (refined) {
 		for (int ci = 0; ci < NCHILD; ci++) {
-			futs.push_back(hpx::async([this, ci]() {
-				children[ci]->form_tree(self, level + 1);
-			}));
+			children[ci]->form_tree(self, level + 1);
 		}
-		hpx::wait_all(futs);
 	}
 }
 
@@ -407,13 +371,9 @@ void tree::compute_smoothing_lengths() {
 
 void tree::compute_smoothing_lengths(tree_ptr root) {
 	if (refined) {
-		std::vector<hpx::future<void>> futs;
 		for (int ci = 0; ci < NCHILD; ci++) {
-			futs.push_back(hpx::async([this, ci, root]() {
-				children[ci]->compute_smoothing_lengths(root);
-			}));
+			children[ci]->compute_smoothing_lengths(root);
 		}
-		hpx::wait_all(futs);
 	} else if (parts.size()) {
 		std::vector<const particle*> others;
 		const real vol = box_volume(box);
@@ -430,6 +390,7 @@ void tree::compute_smoothing_lengths(tree_ptr root) {
 			int iters = 0;
 			//		printf("\n");
 			double max_dh = std::numeric_limits<double>::max();
+			bool done = false;
 			do {
 				root->particles_in_sphere(others, part.x, part.h);
 				N = 0.0;
@@ -458,7 +419,11 @@ void tree::compute_smoothing_lengths(tree_ptr root) {
 					abort();
 				}
 				iters++;
-			} while (std::abs(NGB - N) > 0.5);
+				if (std::abs(NGB - N) < 0.0001) {
+					done = true;
+					root->particles_in_sphere(others, part.x, h);
+				}
+			} while (!done);
 			part.neighbors.resize(0);
 			for (auto &other : others) {
 				if (other != &part) {
@@ -471,13 +436,9 @@ void tree::compute_smoothing_lengths(tree_ptr root) {
 
 void tree::compute_gradients() {
 	if (refined) {
-		std::vector<hpx::future<void>> futs;
 		for (int ci = 0; ci < NCHILD; ci++) {
-			futs.push_back(hpx::async([this, ci]() {
-				children[ci]->compute_gradients();
-			}));
+			children[ci]->compute_gradients();
 		}
-		hpx::wait_all(futs);
 	} else if (parts.size()) {
 		for (auto &part : parts) {
 			auto &pi = part;

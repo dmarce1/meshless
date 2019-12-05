@@ -17,22 +17,31 @@ void output_silo(const std::vector<particle> &parts, const char *filename) {
 #elif( NDIM ==2)
 	const int shapetypes[1] = { DB_ZONETYPE_TRIANGLE };
 #else
-	const int shapetypes[1] = {DB_ZONETYPE_TET};
+	const int shapetypes[1] = { DB_ZONETYPE_TET };
 #endif
 	const int shapesize[1] = { NDIM + 1 };
-	const auto delaunay_regions = compute_delaunay_regions(parts);
+	auto delaunay_regions = compute_delaunay_regions(parts);
 	const int nzones = delaunay_regions.size();
 	const int nnodes = parts.size();
 	const int shapecount[1] = { nzones };
 	std::vector<int> node_list;
 	node_list.reserve(NDIM * delaunay_regions.size());
-	for (const auto r : delaunay_regions) {
+	for (auto& r : delaunay_regions) {
+#if(NDIM==3)
+		const auto a = parts[r[1]].x - parts[r[0]].x;
+		const auto b = parts[r[2]].x - parts[r[0]].x;
+		const auto c = parts[r[3]].x - parts[r[0]].x;
+		const auto tp = triple_product(c, a, b) > 0.0;
+		if (triple_product(c, a, b) > 0.0) {
+			std::swap(r[0], r[1]);
+		}
+#endif
 		for (int n = 0; n < NDIM + 1; n++) {
 			node_list.push_back(r[n]);
 		}
 	}
-	real* coords[NDIM];
-	char* coordnames[NDIM];
+	real *coords[NDIM];
+	char *coordnames[NDIM];
 	for (int dim = 0; dim < NDIM; dim++) {
 		coords[dim] = new real[nnodes];
 		coordnames[dim] = new char[2];
@@ -53,11 +62,11 @@ void output_silo(const std::vector<particle> &parts, const char *filename) {
 	for (int dim = 0; dim < NDIM; dim++) {
 		mom[dim].reserve(nnodes);
 	}
-	for (const auto& pi : parts) {
+	for (const auto &pi : parts) {
 		rho.push_back(pi.st.mass() / pi.V);
 		energy.push_back(pi.st.energy() / pi.V);
 		for (int dim = 0; dim < NDIM; dim++) {
-			mom[dim].push_back(pi.st.momentum(dim)/ pi.V) ;
+			mom[dim].push_back(pi.st.momentum(dim) / pi.V);
 		}
 	}
 	DBPutUcdvar1(db, "density", "mesh", rho.data(), nnodes, NULL, 0, DB_DOUBLE, DB_NODECENT, NULL);
