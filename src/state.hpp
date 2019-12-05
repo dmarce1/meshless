@@ -62,7 +62,7 @@ struct state: public general_vect<real, STATE_SIZE> {
 		for (int dim = 0; dim < NDIM; dim++) {
 			f.momentum(dim) = momentum(dim) * vnorm + norm[dim] * pre;
 		}
-		f.energy() = mass() * vnorm + v0.dot(norm) * pre;
+		f.energy() = energy() * vnorm + v0.dot(norm) * pre;
 		const auto cs = std::sqrt(ein / mass() * fgamma * (fgamma - 1));
 		p.second = cs + std::abs(vnorm);
 		return p;

@@ -9,7 +9,7 @@
 #define DIM_HPP_
 
 
-#define NDIM 2
+#define NDIM 1
 static constexpr int NCHILD = 1 << NDIM;
 static constexpr int NSIBLING = 2 * NDIM;
 
