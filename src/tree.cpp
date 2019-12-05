@@ -13,7 +13,7 @@
 
 #if(NDIM == 1 )
 #define C 1
-#define NGB 2
+#define NGB 4
 #else
 #if( NDIM == 2 )
 #define C M_PI
@@ -459,8 +459,9 @@ void tree::compute_gradients() {
 			}
 			for (auto &other : part.neighbors) {
 				const auto &pj = *(other->ptr);
+				const state st_j = state(pj.st / pj.V).to_prim();
 				for (int dim = 0; dim < NDIM; dim++) {
-					pi.gradient[dim] = pi.gradient[dim] + (state(pj.st / pj.V).to_prim() - state(pi.st / pi.V).to_prim()) * other->psi_a[dim];
+					pi.gradient[dim] = pi.gradient[dim] + (st_j - st_i) * other->psi_a[dim];
 				}
 			}
 			for (auto &other : part.neighbors) {
@@ -480,7 +481,8 @@ void tree::compute_gradients() {
 				max_mid = max(max_mid, mid_st);
 				min_mid = min(min_mid, mid_st);
 			}
-			const auto beta = std::max(1.0, std::min(1.5, Ncond_crit / pi.Ncond));
+	//		const auto beta = std::max(1.0, std::min(2.0, Ncond_crit / pi.Ncond));
+			constexpr auto beta = 1.0;
 			real alpha;
 			for (int i = 0; i < STATE_SIZE; i++) {
 				const auto dmax_ngb = max_ngb[i] - st_i[i];

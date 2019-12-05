@@ -31,7 +31,7 @@ int hpx_main(int argc, char *argv[]) {
 	feenableexcept(FE_INVALID);
 	feenableexcept(FE_OVERFLOW);
 
-	auto parts = cartesian_particle_set(1000);
+	auto parts = cartesian_particle_set(100);
 	range box;
 	for( int dim = 0; dim < NDIM; dim++) {
 		box.first[dim] = -0.51;
