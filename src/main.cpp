@@ -31,13 +31,13 @@ int hpx_main(int argc, char *argv[]) {
 	feenableexcept(FE_INVALID);
 	feenableexcept(FE_OVERFLOW);
 
-	auto parts = cartesian_particle_set(25);
+	auto parts = cartesian_particle_set(100);
 	range box;
 	for( int dim = 0; dim < NDIM; dim++) {
-		box.first[dim] = -0.5;
-		box.second[dim] = 0.5;
+		box.first[dim] = -0.51;
+		box.second[dim] = 0.51;
 	}
-	auto t = tree::new_tree(std::move(parts));
+	auto t = tree::new_tree(std::move(parts), box);
 	t->form_tree();
 	t->compute_smoothing_lengths();
 	t->compute_volumes();
@@ -49,11 +49,11 @@ int hpx_main(int argc, char *argv[]) {
 	while (tm < 0.1) {
 		t->compute_interactions();
 		t->compute_gradients();
-		real dt = 0.8 * t->compute_fluxes();
+		real dt = 0.2 * t->compute_fluxes();
 		t->compute_next_step(dt);
-	//	t->boundary_conditions();
+		t->boundary_conditions();
 		parts = t->gather_particles();
-		t = tree::new_tree(std::move(parts));
+		t = tree::new_tree(std::move(parts), box);
 		t->form_tree();
 		t->compute_smoothing_lengths();
 		t->find_neighbors();

@@ -71,8 +71,8 @@ std::vector<delauny_region> compute_delaunay_regions(const std::vector<particle>
 		regions.push_back(r);
 	}
 	fclose(fp);
-	return regions;
 #endif
+	return regions;
 	SYSTEM_ERROR: printf("Problem with Delauay\n");
 	abort();
 }

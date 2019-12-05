@@ -13,7 +13,7 @@ void output_silo(const std::vector<particle> &parts, const char *filename) {
 	DBfile *db = DBCreateReal(filename, DB_CLOBBER, DB_LOCAL, "Meshless",
 	DB_HDF5);
 #if( NDIM == 1)
-	const int shapetypes[1] = {[DB_ZONETYPE_BEAM};
+	const int shapetypes[1] = {DB_ZONETYPE_BEAM};
 #elif( NDIM ==2)
 	const int shapetypes[1] = { DB_ZONETYPE_TRIANGLE };
 #else

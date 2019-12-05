@@ -139,8 +139,8 @@ real tree::compute_fluxes() {
 						state L = pi.st / pi.V;
 						state R = pj.st / pj.V;
 						for (int dim = 0; dim < NDIM; dim++) {
-			//				L = L + pi.gradient[dim] * dxL[dim];
-//							R = R + pj.gradient[dim] * dxR[dim];
+							L = L + pi.gradient[dim] * dxL[dim];
+							R = R + pj.gradient[dim] * dxR[dim];
 						}
 						const auto tmp = flux(L, R, vij, norm);
 						other->flux = tmp.first;
