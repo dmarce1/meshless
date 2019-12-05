@@ -28,6 +28,7 @@ set(source_files
 	src/particle.cpp
 	src/tree.cpp
 	src/silo.cpp
+	src/state.cpp
 )
 
 set(header_files

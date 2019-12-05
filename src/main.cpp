@@ -64,6 +64,7 @@ int hpx_main(int argc, char *argv[]) {
 		t->output("parts.txt");
 		iter++;
 		printf("n_parts            = %i\n", stats.n_part);
+		output_silo(t->gather_particles(),"X.silo");
 	}
 	output_silo(t->gather_particles(),"X.silo");
 	parts = t->gather_particles();

@@ -8,7 +8,10 @@
 #ifndef STATE_HPP_
 #define STATE_HPP_
 
+
 #include <cassert>
+
+#include "vect.hpp"
 
 static int constexpr STATE_SIZE = 2 + NDIM;
 static double constexpr fgamma = 7.0 / 5.0;
@@ -50,37 +53,12 @@ struct state: public general_vect<real, STATE_SIZE> {
 	real& momentum(int i) {
 		return (*this)[2 + i];
 	}
-	std::pair<state, real> flux(const vect &vf, const vect &norm) const {
-		std::pair<state, real> p;
-		state &f = p.first;
-		const auto v0 = momentum() / mass();
-		const auto v = v0 - vf;
-		const auto vnorm = v.dot(norm);
-		const auto ein = std::max(energy() - momentum().dot(momentum()) * (0.5 / mass()), 0.0);
-		const auto pre = (fgamma - 1.0) * ein;
-		f.mass() = mass() * vnorm;
-		for (int dim = 0; dim < NDIM; dim++) {
-			f.momentum(dim) = momentum(dim) * vnorm + norm[dim] * pre;
-		}
-		f.energy() = energy() * vnorm + v0.dot(norm) * pre;
-		const auto cs = std::sqrt(ein / mass() * fgamma * (fgamma - 1));
-		p.second = cs + std::abs(vnorm);
-		return p;
-	}
+	std::pair<state, real> flux(const vect &vf, const vect &norm) const;
+	state to_prim() const;
+	state to_con() const;
 };
 
-inline std::pair<state, real> flux(const state &L, const state &R, const vect &vf, const vect &norm) {
-	std::pair<state, real> F;
-	const auto tmpL = L.flux(vf, norm);
-	const auto tmpR = R.flux(vf, norm);
-	const state &fL = tmpL.first;
-	const state &fR = tmpR.first;
-	const real &cL = tmpL.second;
-	const real &cR = tmpR.second;
-	const real c = std::max(cL, cR);
-	F.first = ((fL + fR) - (R - L) * c) * 0.5;
-	F.second = cR + cL;
-	return F;
-}
+
+std::pair<state, real> flux(const state &L, const state &R, const vect &vf, const vect &norm);
 
 #endif /* STATE_HPP_ */

@@ -136,12 +136,14 @@ real tree::compute_fluxes() {
 						auto norm = A / abs(A);
 						const auto dxL = other->xij - pi.x;
 						const auto dxR = other->xij - pj.x;
-						state L = pi.st / pi.V;
-						state R = pj.st / pj.V;
+						state L = state(pi.st / pi.V).to_prim();
+						state R = state(pj.st / pj.V).to_prim();
 						for (int dim = 0; dim < NDIM; dim++) {
 							L = L + pi.gradient[dim] * dxL[dim];
 							R = R + pj.gradient[dim] * dxR[dim];
 						}
+						L = L.to_con();
+						R = R.to_con();
 						const auto tmp = flux(L, R, vij, norm);
 						other->flux = tmp.first;
 						other->ret->flux = -tmp.first;
@@ -418,7 +420,7 @@ void tree::compute_smoothing_lengths(tree_ptr root) {
 					abort();
 				}
 				iters++;
-				if (std::abs(NGB - N) < 1e-3) {
+				if (std::abs(NGB - N) < 1e-6) {
 					done = true;
 					root->particles_in_sphere(others, part.x, h);
 				}
@@ -451,14 +453,14 @@ void tree::compute_gradients() {
 			state max_mid;
 			state min_mid;
 			state mid_st;
-			const auto st_i = pi.st / pi.V;
+			const state st_i = state(pi.st / pi.V).to_prim();
 			for (int i = 0; i < STATE_SIZE; i++) {
 				max_mid[i] = max_ngb[i] = min_mid[i] = min_ngb[i] = st_i[i];
 			}
 			for (auto &other : part.neighbors) {
 				const auto &pj = *(other->ptr);
 				for (int dim = 0; dim < NDIM; dim++) {
-					pi.gradient[dim] = pi.gradient[dim] + (pj.st / pj.V - pi.st / pi.V) * other->psi_a[dim];
+					pi.gradient[dim] = pi.gradient[dim] + (state(pj.st / pj.V).to_prim() - state(pi.st / pi.V).to_prim()) * other->psi_a[dim];
 				}
 			}
 			for (auto &other : part.neighbors) {
@@ -467,9 +469,9 @@ void tree::compute_gradients() {
 				auto &xij = other->xij;
 				xij = pi.x + dx * (pi.h) / (pi.h + pj.h);
 				other->vij = pi.v() + (pj.v() - pi.v()) * (xij - pi.x).dot(dx) / (dx.dot(dx));
-				const auto st_j = pj.st / pj.V;
+				const state st_j = state(pj.st / pj.V).to_prim();
 				const auto mid_dx = other->xij - pi.x;
-				mid_st = pi.st / pi.V;
+				mid_st = state(pi.st / pi.V).to_prim();
 				for (int dim = 0; dim < NDIM; dim++) {
 					mid_st = mid_st + pi.gradient[dim] * mid_dx[dim];
 				}
@@ -493,7 +495,7 @@ void tree::compute_gradients() {
 				for (auto &other : part.neighbors) {
 					const auto &pj = *(other->ptr);
 					for (int dim = 0; dim < NDIM; dim++) {
-						pi.gradient[dim] = pi.gradient[dim] * alpha;
+						pi.gradient[dim][i] = pi.gradient[dim][i] * alpha;
 					}
 				}
 			}
