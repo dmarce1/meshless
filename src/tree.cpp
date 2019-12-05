@@ -38,10 +38,10 @@ tree::tree(std::vector<particle> &&parts) :
 			min = std::min(min, x);
 			max = std::max(max, x);
 		}
-		for (int dim = 0; dim < NDIM; dim++) {
-			box.first[dim] -= std::numeric_limits<real>::epsilon() * box.first[dim];
-			box.second[dim] += std::numeric_limits<real>::epsilon() * box.second[dim];
-		}
+	}
+	for (int dim = 0; dim < NDIM; dim++) {
+		box.first[dim] -= 1.0e-12 * std::abs(box.first[dim]);
+		box.second[dim] += 1.0e-12 * std::abs(box.second[dim]);
 	}
 	make_tree(std::move(parts));
 }
@@ -101,12 +101,15 @@ void tree::boundary_conditions(const range &rng) {
 			children[ci]->boundary_conditions(rng);
 		}
 	} else {
-		for (int i = 0; i < parts.size(); i++) {
+		int sz = parts.size();
+		for (int i = 0; i < sz; i++) {
 			if (!in_range(parts[i].x, rng)) {
-				parts[i] = std::move(parts[parts.size() - 1]);
-				parts.resize(parts.size() - 1);
+				sz--;
+				parts[i] = std::move(parts[sz]);
+				i--;
 			}
 		}
+		parts.resize(sz);
 	}
 }
 real tree::compute_fluxes() {
@@ -136,8 +139,8 @@ real tree::compute_fluxes() {
 						state L = pi.st / pi.V;
 						state R = pj.st / pj.V;
 						for (int dim = 0; dim < NDIM; dim++) {
-							L = L + pi.gradient[dim] * dxL[dim];
-							R = R + pj.gradient[dim] * dxR[dim];
+			//				L = L + pi.gradient[dim] * dxL[dim];
+//							R = R + pj.gradient[dim] * dxR[dim];
 						}
 						const auto tmp = flux(L, R, vij, norm);
 						other->flux = tmp.first;
@@ -197,14 +200,10 @@ void tree::compute_next_step(real dt) {
 	} else {
 		for (auto &part : parts) {
 			auto &pi = part;
-			for (auto &other : part.neighbors) {
-				const auto area = abs(other->area);
-				pi.st = pi.st - other->flux * dt * area * 0.5;
-			}
 			pi.x = pi.x + pi.v() * dt;
 			for (auto &other : part.neighbors) {
 				const auto area = abs(other->area);
-				pi.st = pi.st - other->flux * dt * area * 0.5;
+				pi.st = pi.st - other->flux * dt * area;
 			}
 		}
 	}
@@ -419,7 +418,7 @@ void tree::compute_smoothing_lengths(tree_ptr root) {
 					abort();
 				}
 				iters++;
-				if (std::abs(NGB - N) < 0.0001) {
+				if (std::abs(NGB - N) < 1e-3) {
 					done = true;
 					root->particles_in_sphere(others, part.x, h);
 				}

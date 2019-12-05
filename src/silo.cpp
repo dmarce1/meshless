@@ -31,7 +31,6 @@ void output_silo(const std::vector<particle> &parts, const char *filename) {
 		const auto a = parts[r[1]].x - parts[r[0]].x;
 		const auto b = parts[r[2]].x - parts[r[0]].x;
 		const auto c = parts[r[3]].x - parts[r[0]].x;
-		const auto tp = triple_product(c, a, b) > 0.0;
 		if (triple_product(c, a, b) > 0.0) {
 			std::swap(r[0], r[1]);
 		}
