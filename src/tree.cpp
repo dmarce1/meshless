@@ -461,7 +461,6 @@ void tree::compute_gradients() {
 					pi.gradient[dim] = pi.gradient[dim] + (pj.st / pj.V - pi.st / pi.V) * other->psi_a[dim];
 				}
 			}
-			real alpha = 1.0;
 			for (auto &other : part.neighbors) {
 				const auto &pj = *(other->ptr);
 				auto dx = pj.x - pi.x;
@@ -480,6 +479,7 @@ void tree::compute_gradients() {
 				min_mid = min(min_mid, mid_st);
 			}
 			const auto beta = std::max(1.0, std::min(1.5, Ncond_crit / pi.Ncond));
+			real alpha;
 			for (int i = 0; i < STATE_SIZE; i++) {
 				const auto dmax_ngb = max_ngb[i] - st_i[i];
 				const auto dmax_mid = max_mid[i] - st_i[i];
