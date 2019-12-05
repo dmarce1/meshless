@@ -13,7 +13,7 @@
 
 #if(NDIM == 1 )
 #define C 1
-#define NGB 4
+#define NGB 2
 #else
 #if( NDIM == 2 )
 #define C M_PI
@@ -136,12 +136,8 @@ real tree::compute_fluxes() {
 						auto norm = A / abs(A);
 						const auto dxL = other->xij - pi.x;
 						const auto dxR = other->xij - pj.x;
-						state L = state(pi.st / pi.V).to_prim();
-						state R = state(pj.st / pj.V).to_prim();
-						for (int dim = 0; dim < NDIM; dim++) {
-							L = L + pi.gradient[dim] * dxL[dim];
-							R = R + pj.gradient[dim] * dxR[dim];
-						}
+						state L = other->U;
+						state R = other->ret->U;
 						L = L.to_con();
 						R = R.to_con();
 						const auto tmp = flux(L, R, vij, norm);
@@ -441,67 +437,107 @@ void tree::compute_gradients() {
 			children[ci]->compute_gradients();
 		}
 	} else if (parts.size()) {
+
+		std::array<state, NDIM> gradient;
+
 		for (auto &part : parts) {
 			auto &pi = part;
 			for (int dim = 0; dim < NDIM; dim++) {
 				for (int i = 0; i < STATE_SIZE; i++) {
-					pi.gradient[dim][i] = 0.0;
+					gradient[dim][i] = 0.0;
 				}
 			}
 			state max_ngb;
 			state min_ngb;
-			state max_mid;
-			state min_mid;
-			state mid_st;
 			const state st_i = state(pi.st / pi.V).to_prim();
 			for (int i = 0; i < STATE_SIZE; i++) {
-				max_mid[i] = max_ngb[i] = min_mid[i] = min_ngb[i] = st_i[i];
+				max_ngb[i] = min_ngb[i] = st_i[i];
 			}
 			for (auto &other : part.neighbors) {
 				const auto &pj = *(other->ptr);
 				const state st_j = state(pj.st / pj.V).to_prim();
 				for (int dim = 0; dim < NDIM; dim++) {
-					pi.gradient[dim] = pi.gradient[dim] + (st_j - st_i) * other->psi_a[dim];
+					gradient[dim] = gradient[dim] + (st_j - st_i) * other->psi_a[dim];
 				}
 			}
+			real max_dx = 0.0;
 			for (auto &other : part.neighbors) {
 				const auto &pj = *(other->ptr);
 				auto dx = pj.x - pi.x;
 				auto &xij = other->xij;
 				xij = pi.x + dx * (pi.h) / (pi.h + pj.h);
-				other->vij = pi.v() + (pj.v() - pi.v()) * (xij - pi.x).dot(dx) / (dx.dot(dx));
 				const state st_j = state(pj.st / pj.V).to_prim();
 				const auto mid_dx = other->xij - pi.x;
-				mid_st = state(pi.st / pi.V).to_prim();
-				for (int dim = 0; dim < NDIM; dim++) {
-					mid_st = mid_st + pi.gradient[dim] * mid_dx[dim];
-				}
+				max_dx = std::max(max_dx, std::sqrt(mid_dx.dot(mid_dx)));
 				max_ngb = max(max_ngb, st_j);
 				min_ngb = min(min_ngb, st_j);
-				max_mid = max(max_mid, mid_st);
-				min_mid = min(min_mid, mid_st);
 			}
-	//		const auto beta = std::max(1.0, std::min(2.0, Ncond_crit / pi.Ncond));
-			constexpr auto beta = 1.0;
+			const auto beta = std::max(1.0, std::min(2.0, Ncond_crit / pi.Ncond));
 			real alpha;
 			for (int i = 0; i < STATE_SIZE; i++) {
 				const auto dmax_ngb = max_ngb[i] - st_i[i];
-				const auto dmax_mid = max_mid[i] - st_i[i];
 				const auto dmin_ngb = st_i[i] - min_ngb[i];
-				const auto dmin_mid = st_i[i] - min_mid[i];
-				if (dmax_mid == 0.0 || dmin_mid == 0.0) {
+				real grad_abs = 0.0;
+				for (int dim = 0; dim < NDIM; dim++) {
+					grad_abs += gradient[dim][i] * gradient[dim][i];
+				}
+				grad_abs = std::sqrt(grad_abs);
+				const real den = grad_abs * max_dx;
+				if (den == 0.0) {
 					alpha = 1.0;
 				} else {
-					alpha = std::min(1.0, beta * std::min(dmax_ngb / dmax_mid, dmin_ngb / dmin_mid));
+					alpha = std::min(1.0, beta * std::min(dmax_ngb / den, dmin_ngb / den));
 				}
 				for (auto &other : part.neighbors) {
 					const auto &pj = *(other->ptr);
 					for (int dim = 0; dim < NDIM; dim++) {
-						pi.gradient[dim][i] = pi.gradient[dim][i] * alpha;
+						gradient[dim][i] = gradient[dim][i] * alpha;
+					}
+				}
+
+			}
+			constexpr auto psi1 = 0.5;
+			constexpr auto psi2 = 0.25;
+			for (auto &other : part.neighbors) {
+				const auto &pj = *(other->ptr);
+				state &phi_mid = other->U;
+				state phi_i = state(pi.st / pi.V).to_prim();
+				state phi_j = state(pj.st / pj.V).to_prim();
+				phi_mid = phi_i;
+				for (int dim = 0; dim < NDIM; dim++) {
+					const auto dx = other->xij - pi.x;
+					phi_mid = phi_mid + gradient[dim] * dx[dim];
+				}
+				const auto dphi_abs = abs(phi_j, phi_i);
+				const auto delta_1 = dphi_abs * psi1;
+				const auto delta_2 = dphi_abs * psi2;
+				const auto phi_min = min(phi_i, phi_j);
+				const auto phi_max = max(phi_i, phi_j);
+				const auto phi_bar = phi_i + (phi_j - phi_i) * abs(other->xij - pi.x) / abs(pi.x - pj.x);
+				for (int i = 0; i < STATE_SIZE; i++) {
+					if (phi_i[i] == phi_j[i]) {
+						phi_mid[i] = phi_i[i];
+					} else if (phi_i[i] < phi_j[i]) {
+						state phi_m;
+						if ((phi_min[i] - delta_1[i]) * phi_min[i] > 0.0) {
+							phi_m[i] = phi_min[i] - delta_1[i];
+						} else {
+							phi_m[i] = phi_min[i] * std::abs(phi_min[i]) / (std::abs(phi_min[i]) + delta_1[i]);
+						}
+						phi_mid[i] = std::max(phi_m[i], std::min(phi_bar[i] + delta_2[i], phi_mid[i]));
+					} else {
+						state phi_p;
+						if ((phi_max[i] + delta_1[i]) * phi_max[i] > 0.0) {
+							phi_p[i] = phi_max[i] + delta_1[i];
+						} else {
+							phi_p[i] = phi_max[i] * std::abs(phi_max[i]) / (std::abs(phi_max[i]) + delta_1[i]);
+						}
+						phi_mid[i] = std::max(phi_p[i], std::min(phi_bar[i] - delta_2[i], phi_mid[i]));
 					}
 				}
 			}
 		}
+
 	}
 }
 real tree::compute_volumes() {

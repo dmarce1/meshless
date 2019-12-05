@@ -111,6 +111,15 @@ inline T abs(const general_vect<T, N> &v) {
 }
 
 template<class T, int N>
+inline general_vect<T, N> abs(const general_vect<T, N> &a,const general_vect<T, N> &b) {
+	general_vect<T, N> c;
+	for( int i = 0; i < N; i++) {
+		c[i] = std::abs(a[i] - b[i]);
+	}
+	return c;
+}
+
+template<class T, int N>
 inline general_vect<T, N> max(const general_vect<T, N> &a, const general_vect<T, N> &b) {
 	general_vect<T, N> c;
 	for (int i = 0; i < N; i++) {

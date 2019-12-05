@@ -23,7 +23,7 @@ struct neighbor {
 	state flux;
 	vect psi_a;
 	vect xij;
-	vect vij;
+	state U;
 	inline neighbor(particle *_ptr) :
 			ptr(_ptr) {
 	}
@@ -37,7 +37,6 @@ struct particle {
 	real V;
 	state st;
 	real Ncond;
-	std::array<state,NDIM> gradient;
 	real rho() const {
 		return st.mass() / V;
 	}
